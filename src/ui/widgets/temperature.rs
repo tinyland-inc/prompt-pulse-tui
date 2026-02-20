@@ -33,8 +33,11 @@ pub fn draw_temperatures(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    let header = Row::new(vec!["Sensor", "Temp", "Max"])
-        .style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD));
+    let header = Row::new(vec!["Sensor", "Temp", "Max"]).style(
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    );
 
     let rows: Vec<Row> = snap
         .temperatures
@@ -42,11 +45,19 @@ pub fn draw_temperatures(frame: &mut Frame, area: Rect, app: &App) {
         .enumerate()
         .map(|(i, t)| {
             let color = temp_gradient(t.temp_c);
-            let bg = if i % 2 == 1 { Color::Rgb(30, 30, 40) } else { Color::Reset };
+            let bg = if i % 2 == 1 {
+                Color::Rgb(30, 30, 40)
+            } else {
+                Color::Reset
+            };
             Row::new(vec![
                 truncate_label(&t.label, 22),
                 format!("{:.0}°C", t.temp_c),
-                if t.max_c > 0.0 { format!("{:.0}°C", t.max_c) } else { "-".into() },
+                if t.max_c > 0.0 {
+                    format!("{:.0}°C", t.max_c)
+                } else {
+                    "-".into()
+                },
             ])
             .style(Style::default().fg(color).bg(bg))
         })

@@ -1,3 +1,12 @@
+#![allow(
+    dead_code,
+    clippy::redundant_closure,
+    clippy::manual_div_ceil,
+    clippy::if_same_then_else,
+    clippy::needless_range_loop,
+    clippy::derivable_impls
+)]
+
 mod app;
 mod config;
 mod data;
