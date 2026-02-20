@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use image::DynamicImage;
+use image::{DynamicImage, ImageReader};
 
 use crate::config::TuiConfig;
 
@@ -28,7 +28,7 @@ pub fn load_cached_waifu(cfg: &TuiConfig) -> Result<Option<DynamicImage>> {
 
     match newest {
         Some((_, path)) => {
-            let img = image::open(&path)?;
+            let img = open_by_magic(&path)?;
             Ok(Some(img))
         }
         None => Ok(None),
@@ -53,8 +53,9 @@ pub fn list_images(cfg: &TuiConfig) -> Vec<PathBuf> {
 }
 
 /// Load a specific image by path.
+/// Uses magic byte detection so files with non-standard extensions (e.g. `.img`) are handled.
 pub fn load_image(path: &Path) -> Result<DynamicImage> {
-    Ok(image::open(path)?)
+    open_by_magic(path)
 }
 
 /// Format an image filename as a human-readable name.
@@ -62,6 +63,13 @@ pub fn load_image(path: &Path) -> Result<DynamicImage> {
 pub fn format_image_name(path: &Path) -> String {
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
     stem.replace(['_', '-'], " ")
+}
+
+/// Open an image file using magic byte detection instead of relying on extension.
+/// The Go daemon saves images with `.img` extension which `image::open()` can't recognize.
+fn open_by_magic(path: &Path) -> Result<DynamicImage> {
+    let reader = ImageReader::open(path)?.with_guessed_format()?;
+    Ok(reader.decode()?)
 }
 
 fn is_image_file(path: &Path) -> bool {
