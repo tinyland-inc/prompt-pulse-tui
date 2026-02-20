@@ -6,7 +6,15 @@ use crate::app::App;
 
 pub fn draw_waifu(frame: &mut Frame, area: Rect, app: &mut App) {
     let protocol_name = format!("{:?}", app.picker.protocol_type());
-    let title = format!(" Waifu [{protocol_name}] ");
+    let title = if !app.waifu_images.is_empty() && app.waifu_index >= 0 {
+        format!(
+            " Waifu [{protocol_name}] [{}/{}] ",
+            app.waifu_index + 1,
+            app.waifu_images.len()
+        )
+    } else {
+        format!(" Waifu [{protocol_name}] ")
+    };
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -16,13 +24,25 @@ pub fn draw_waifu(frame: &mut Frame, area: Rect, app: &mut App) {
 
     match &mut app.waifu_state {
         Some(state) => {
-            // Render the border block first, then the image inside the inner area.
             let inner = block.inner(area);
             frame.render_widget(block, area);
 
             if inner.width > 0 && inner.height > 0 {
                 let image_widget = StatefulImage::new(None);
                 frame.render_stateful_widget(image_widget, inner, state);
+
+                // Info overlay: show formatted filename on bottom line.
+                if app.waifu_show_info && !app.waifu_name.is_empty() && inner.height > 1 {
+                    let overlay_area = Rect::new(
+                        inner.x,
+                        inner.y + inner.height - 1,
+                        inner.width,
+                        1,
+                    );
+                    let overlay = Paragraph::new(app.waifu_name.as_str())
+                        .style(Style::default().fg(Color::White).bg(Color::Black).add_modifier(Modifier::DIM));
+                    frame.render_widget(overlay, overlay_area);
+                }
             }
         }
         None => {

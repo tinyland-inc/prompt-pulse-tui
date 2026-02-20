@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::path::PathBuf;
 use std::time::Instant;
 
 use anyhow::Result;
@@ -8,6 +9,7 @@ use ratatui_image::protocol::StatefulProtocol;
 
 use crate::config::TuiConfig;
 use crate::data::{self, CacheReader, SysMetrics, TailscaleStatus, ClaudeUsage, BillingReport, K8sStatus};
+use crate::data::claudepersonal::ClaudePersonalReport;
 
 /// Maximum number of historical data points for sparklines (~60s at 1s interval).
 const HISTORY_LEN: usize = 60;
@@ -134,6 +136,18 @@ pub struct App {
     // Waifu image rendering state (ratatui-image StatefulProtocol).
     pub waifu_state: Option<StatefulProtocol>,
 
+    // Waifu sequential navigation state.
+    pub waifu_images: Vec<PathBuf>,
+    pub waifu_index: i32,
+    pub waifu_show_info: bool,
+    pub waifu_name: String,
+
+    // Claude personal plan usage (read from daemon state file).
+    pub claude_personal: Option<ClaudePersonalReport>,
+
+    // Expand mode: fullscreen single widget (e.g. --expand waifu).
+    pub expanded: bool,
+
     // Image picker for protocol detection.
     pub picker: Picker,
 
@@ -147,7 +161,7 @@ pub struct App {
 }
 
 impl App {
-    pub async fn new(cfg: TuiConfig, mut picker: Picker) -> Result<Self> {
+    pub async fn new(cfg: TuiConfig, mut picker: Picker, expand_widget: Option<String>) -> Result<Self> {
         let cache_reader = CacheReader::new(cfg.cache_dir());
         let sys = SysMetrics::collect();
 
@@ -156,8 +170,15 @@ impl App {
         let claude = cache_reader.read_claude();
         let billing = cache_reader.read_billing();
         let k8s = cache_reader.read_k8s();
+        let claude_personal = cache_reader.read_claude_personal();
 
-        // Load waifu and convert to StatefulProtocol for real rendering.
+        // Load waifu image list and initial image.
+        let waifu_images = if cfg.image.waifu_enabled {
+            data::waifu::list_images(&cfg)
+        } else {
+            Vec::new()
+        };
+
         let waifu_state = if cfg.image.waifu_enabled {
             data::waifu::load_cached_waifu(&cfg)
                 .ok()
@@ -166,6 +187,24 @@ impl App {
         } else {
             None
         };
+
+        // Find the index of the initially loaded image (newest by mtime).
+        let waifu_index: i32 = if !waifu_images.is_empty() {
+            // The newest image is what load_cached_waifu picked; find it in the sorted list.
+            // Since we don't know the exact path, default to last index.
+            (waifu_images.len() as i32) - 1
+        } else {
+            -1
+        };
+
+        let waifu_name = if waifu_index >= 0 {
+            data::waifu::format_image_name(&waifu_images[waifu_index as usize])
+        } else {
+            String::new()
+        };
+
+        // Expand mode from CLI flag.
+        let expanded = expand_widget.as_deref() == Some("waifu");
 
         // Initialize process system with CPU refresh for usage tracking.
         let mut proc_sys = sysinfo::System::new();
@@ -205,6 +244,12 @@ impl App {
             billing,
             k8s,
             waifu_state,
+            waifu_images,
+            waifu_index,
+            waifu_show_info: false,
+            waifu_name,
+            claude_personal,
+            expanded,
             picker,
             proc_sys,
             users,
@@ -261,6 +306,28 @@ impl App {
             return;
         }
 
+        // Expand mode: Esc exits, waifu keys work, everything else ignored.
+        if self.expanded {
+            match key.code {
+                KeyCode::Esc => self.expanded = false,
+                KeyCode::Char('n') => self.waifu_navigate(1),
+                KeyCode::Char('p') => self.waifu_navigate(-1),
+                KeyCode::Char('r') => self.waifu_random(),
+                KeyCode::Char('i') => self.waifu_show_info = !self.waifu_show_info,
+                _ => {}
+            }
+            return;
+        }
+
+        // Dashboard tab: waifu navigation keys when waifu is loaded.
+        if self.active_tab == Tab::Dashboard && self.has_waifu() {
+            match key.code {
+                KeyCode::Char('n') => { self.waifu_navigate(1); return; }
+                KeyCode::Char('i') => { self.waifu_show_info = !self.waifu_show_info; return; }
+                _ => {}
+            }
+        }
+
         match key.code {
             // Freeze toggle (pause data collection).
             KeyCode::Char(' ') => self.frozen = !self.frozen,
@@ -291,12 +358,24 @@ impl App {
                 self.process_scroll = self.processes.len().saturating_sub(1);
             }
             // Sort toggle: c=CPU, m=Memory, p=PID, n=Name.
+            // n/p/r are context-sensitive: on Dashboard with waifu they're handled above.
             KeyCode::Char('c') => self.process_sort = ProcessSort::Cpu,
             KeyCode::Char('m') => self.process_sort = ProcessSort::Memory,
-            KeyCode::Char('p') => self.process_sort = ProcessSort::Pid,
+            KeyCode::Char('p') => {
+                if self.active_tab == Tab::Dashboard && self.has_waifu() {
+                    self.waifu_navigate(-1);
+                } else {
+                    self.process_sort = ProcessSort::Pid;
+                }
+            }
             KeyCode::Char('n') => self.process_sort = ProcessSort::Name,
-            // Reverse sort order.
-            KeyCode::Char('r') => self.sort_reverse = !self.sort_reverse,
+            KeyCode::Char('r') => {
+                if self.active_tab == Tab::Dashboard && self.has_waifu() {
+                    self.waifu_random();
+                } else {
+                    self.sort_reverse = !self.sort_reverse;
+                }
+            }
             // Page up/down for process table.
             KeyCode::PageDown => {
                 if !self.processes.is_empty() {
@@ -530,6 +609,7 @@ impl App {
             self.claude = self.cache_reader.read_claude();
             self.billing = self.cache_reader.read_billing();
             self.k8s = self.cache_reader.read_k8s();
+            self.claude_personal = self.cache_reader.read_claude_personal();
             self.last_cache_read = now;
         }
     }
@@ -537,6 +617,45 @@ impl App {
     /// Check if a waifu image is loaded (for layout decisions).
     pub fn has_waifu(&self) -> bool {
         self.waifu_state.is_some()
+    }
+
+    /// Navigate to a waifu image by relative offset (1 = next, -1 = prev).
+    pub fn waifu_navigate(&mut self, delta: i32) {
+        let n = self.waifu_images.len() as i32;
+        if n == 0 {
+            return;
+        }
+        let base = if self.waifu_index >= 0 { self.waifu_index } else { 0 };
+        let new_idx = ((base + delta) % n + n) % n;
+        self.waifu_load_at(new_idx as usize);
+    }
+
+    /// Navigate to a random waifu image.
+    pub fn waifu_random(&mut self) {
+        let n = self.waifu_images.len();
+        if n == 0 {
+            return;
+        }
+        // Simple pseudo-random using system time nanos.
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0) as usize;
+        let idx = nanos % n;
+        self.waifu_load_at(idx);
+    }
+
+    /// Load the waifu image at the given index.
+    fn waifu_load_at(&mut self, idx: usize) {
+        if idx >= self.waifu_images.len() {
+            return;
+        }
+        let path = &self.waifu_images[idx];
+        if let Ok(img) = data::waifu::load_image(path) {
+            self.waifu_state = Some(self.picker.new_resize_protocol(img));
+            self.waifu_index = idx as i32;
+            self.waifu_name = data::waifu::format_image_name(path);
+        }
     }
 
     /// Kill the currently selected process.

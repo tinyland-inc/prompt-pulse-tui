@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
 use crate::data::{TailscaleStatus, ClaudeUsage, BillingReport, K8sStatus};
+use crate::data::claudepersonal::{self, ClaudePersonalReport, ClaudePersonalState};
 
 const MAX_CACHE_AGE: Duration = Duration::from_secs(300); // 5 minutes
 
@@ -29,6 +30,12 @@ impl CacheReader {
 
     pub fn read_k8s(&self) -> Option<K8sStatus> {
         self.read_json("k8s")
+    }
+
+    /// Read the claude personal state file (written by Go collector, no max age).
+    pub fn read_claude_personal(&self) -> Option<ClaudePersonalReport> {
+        let state: ClaudePersonalState = self.read_json("claude-personal")?;
+        Some(claudepersonal::compute_report(&state))
     }
 
     fn read_json<T: serde::de::DeserializeOwned>(&self, key: &str) -> Option<T> {

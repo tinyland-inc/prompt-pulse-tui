@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod claudepersonal;
 pub mod sysmetrics;
 pub mod tailscale;
 pub mod claude;

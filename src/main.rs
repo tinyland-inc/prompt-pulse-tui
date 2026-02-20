@@ -38,6 +38,12 @@ async fn main() -> Result<()> {
         .with_writer(io::stderr)
         .init();
 
+    // Parse CLI args: --expand <widget-id>
+    let args: Vec<String> = std::env::args().collect();
+    let expand_widget = args.windows(2)
+        .find(|w| w[0] == "--expand")
+        .map(|w| w[1].clone());
+
     let cfg = TuiConfig::load()?;
 
     // Terminal setup.
@@ -52,7 +58,7 @@ async fn main() -> Result<()> {
         Picker::from_fontsize((8, 16))
     });
 
-    let mut app = App::new(cfg, picker).await?;
+    let mut app = App::new(cfg, picker, expand_widget).await?;
 
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
@@ -79,11 +85,18 @@ async fn run_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &m
         if event::poll(TICK_RATE)? {
             match event::read()? {
                 Event::Key(key) => {
-                    if key.code == KeyCode::Char('q')
-                        || key.code == KeyCode::Esc
-                        || (key.modifiers.contains(KeyModifiers::CONTROL)
-                            && key.code == KeyCode::Char('c'))
+                    // Ctrl+C always quits.
+                    if key.modifiers.contains(KeyModifiers::CONTROL)
+                        && key.code == KeyCode::Char('c')
                     {
+                        return Ok(());
+                    }
+                    // q quits (unless in expand mode where Esc exits expand first).
+                    if key.code == KeyCode::Char('q') {
+                        return Ok(());
+                    }
+                    // Esc quits only if not in expand mode.
+                    if key.code == KeyCode::Esc && !app.expanded {
                         return Ok(());
                     }
                     app.handle_key(key);

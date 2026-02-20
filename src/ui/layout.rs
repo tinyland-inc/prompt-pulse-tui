@@ -256,13 +256,18 @@ pub fn network(frame: &mut Frame, area: Rect, app: &mut App) {
     widgets::k8s::draw_k8s(frame, chunks[3], app);
 }
 
-/// Billing tab: Claude usage + cloud billing.
+/// Billing tab: Claude personal gauge + Claude API usage + cloud billing.
 pub fn billing(frame: &mut Frame, area: Rect, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .constraints([
+            Constraint::Length(5),       // Claude Personal gauge
+            Constraint::Percentage(45),  // Claude API usage
+            Constraint::Percentage(45),  // Cloud billing
+        ])
         .split(area);
 
-    widgets::claude::draw_claude(frame, chunks[0], app);
-    widgets::billing_widget::draw_billing(frame, chunks[1], app);
+    widgets::claudepersonal::draw_claude_personal(frame, chunks[0], app);
+    widgets::claude::draw_claude(frame, chunks[1], app);
+    widgets::billing_widget::draw_billing(frame, chunks[2], app);
 }

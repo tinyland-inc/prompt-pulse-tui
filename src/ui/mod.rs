@@ -7,8 +7,15 @@ use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap};
 use crate::app::{App, Tab};
 
 /// Top-level draw: tab bar + active tab content + help bar + optional help overlay.
+/// In expand mode, renders the waifu widget fullscreen (no tab bar or help bar).
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
+
+    // Expand mode: fullscreen waifu.
+    if app.expanded {
+        widgets::waifu::draw_waifu(frame, area, app);
+        return;
+    }
 
     // Split into tab bar (3 lines) + content + help bar (1 line).
     let chunks = Layout::default()
@@ -73,6 +80,12 @@ fn help_tab_tui<'a>() -> Vec<Line<'a>> {
         help_line("dd", "Kill process (TERM)"),
         help_line("D", "Force kill (KILL)"),
         Line::from(""),
+        help_section("Waifu (Dashboard tab)"),
+        Line::from(""),
+        help_line("n / p", "Next / previous image"),
+        help_line("r", "Random image"),
+        help_line("i", "Toggle info overlay"),
+        Line::from(""),
         help_section("Display"),
         Line::from(""),
         help_line("+ / -", "Adjust refresh (250ms-5s)"),
@@ -86,6 +99,7 @@ fn help_tab_shell<'a>() -> Vec<Line<'a>> {
         help_section("Shell Keybindings"),
         Line::from(""),
         help_line("Ctrl+P", "Launch TUI dashboard"),
+        help_line("Ctrl+W", "Launch waifu viewer"),
         help_line("pp", "prompt-pulse alias"),
         help_line("pp-tui", "prompt-pulse-tui alias"),
         help_line("pp-status", "Daemon health check"),

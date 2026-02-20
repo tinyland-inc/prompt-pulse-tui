@@ -28,6 +28,18 @@ pub fn draw_help_bar(frame: &mut Frame, area: Rect, app: &App) {
         Span::styled(" Jump ", Style::default().fg(Color::DarkGray)),
     ];
 
+    // Context-sensitive hints for Dashboard tab (waifu nav).
+    if app.active_tab == Tab::Dashboard && app.has_waifu() {
+        keys.extend([
+            Span::styled("n/p", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(" Nav ", Style::default().fg(Color::DarkGray)),
+            Span::styled("r", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(" Rand ", Style::default().fg(Color::DarkGray)),
+            Span::styled("i", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(" Info ", Style::default().fg(Color::DarkGray)),
+        ]);
+    }
+
     // Context-sensitive hints for System tab.
     if app.active_tab == Tab::System {
         keys.extend([

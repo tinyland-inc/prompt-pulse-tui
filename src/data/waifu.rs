@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use image::DynamicImage;
@@ -17,15 +17,7 @@ pub fn load_cached_waifu(cfg: &TuiConfig) -> Result<Option<DynamicImage>> {
     for entry in std::fs::read_dir(&waifu_dir)? {
         let entry = entry?;
         let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-        let ext = path
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("")
-            .to_lowercase();
-        if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif") {
+        if !is_image_file(&path) {
             continue;
         }
         let modified = entry.metadata()?.modified()?;
@@ -41,6 +33,49 @@ pub fn load_cached_waifu(cfg: &TuiConfig) -> Result<Option<DynamicImage>> {
         }
         None => Ok(None),
     }
+}
+
+/// List all image files in the waifu cache directory, sorted by filename.
+pub fn list_images(cfg: &TuiConfig) -> Vec<PathBuf> {
+    let waifu_dir = waifu_cache_dir(cfg);
+    if !waifu_dir.exists() {
+        return Vec::new();
+    }
+    let mut images: Vec<PathBuf> = std::fs::read_dir(&waifu_dir)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| is_image_file(p))
+        .collect();
+    images.sort();
+    images
+}
+
+/// Load a specific image by path.
+pub fn load_image(path: &Path) -> Result<DynamicImage> {
+    Ok(image::open(path)?)
+}
+
+/// Format an image filename as a human-readable name.
+/// Strips directory and extension, replaces `_` and `-` with spaces.
+pub fn format_image_name(path: &Path) -> String {
+    let stem = path.file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+    stem.replace('_', " ").replace('-', " ")
+}
+
+fn is_image_file(path: &Path) -> bool {
+    if !path.is_file() {
+        return false;
+    }
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif")
 }
 
 fn waifu_cache_dir(cfg: &TuiConfig) -> PathBuf {

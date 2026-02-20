@@ -7,6 +7,7 @@ pub mod network;
 pub mod tailscale;
 pub mod k8s;
 pub mod claude;
+pub mod claudepersonal;
 pub mod billing_widget;
 pub mod waifu;
 pub mod sparkline;
