@@ -75,7 +75,7 @@ fn is_image_file(path: &Path) -> bool {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
-    matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif")
+    matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "img")
 }
 
 fn waifu_cache_dir(cfg: &TuiConfig) -> PathBuf {
