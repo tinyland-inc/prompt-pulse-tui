@@ -84,6 +84,7 @@ fn help_tab_tui<'a>() -> Vec<Line<'a>> {
         Line::from(""),
         help_line("n / p", "Next / previous image"),
         help_line("r", "Random image"),
+        help_line("f", "Fetch new from live service"),
         help_line("i", "Toggle info overlay"),
         Line::from(""),
         help_section("Display"),

@@ -6,14 +6,16 @@ use crate::app::App;
 
 pub fn draw_waifu(frame: &mut Frame, area: Rect, app: &mut App) {
     let protocol_name = format!("{:?}", app.picker.protocol_type());
+    let live = if app.cfg.waifu_endpoint().is_some() { " Live" } else { "" };
+    let fetch_indicator = if app.waifu_fetching { " ..." } else { "" };
     let title = if !app.waifu_images.is_empty() && app.waifu_index >= 0 {
         format!(
-            " Waifu [{protocol_name}] [{}/{}] ",
+            " Waifu [{protocol_name}] [{}/{}]{live}{fetch_indicator} ",
             app.waifu_index + 1,
             app.waifu_images.len()
         )
     } else {
-        format!(" Waifu [{protocol_name}] ")
+        format!(" Waifu [{protocol_name}]{live}{fetch_indicator} ")
     };
 
     let block = Block::default()
@@ -46,7 +48,12 @@ pub fn draw_waifu(frame: &mut Frame, area: Rect, app: &mut App) {
             }
         }
         None => {
-            let paragraph = Paragraph::new("No waifu cached")
+            let msg = if app.cfg.waifu_endpoint().is_some() {
+                "Press 'f' to fetch from live service"
+            } else {
+                "No waifu cached"
+            };
+            let paragraph = Paragraph::new(msg)
                 .style(Style::default().fg(Color::DarkGray))
                 .block(block)
                 .alignment(Alignment::Center);

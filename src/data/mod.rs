@@ -6,6 +6,7 @@ pub mod claude;
 pub mod billing;
 pub mod k8s;
 pub mod waifu;
+pub mod waifu_client;
 
 pub use cache::CacheReader;
 pub use sysmetrics::SysMetrics;

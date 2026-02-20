@@ -35,8 +35,17 @@ pub fn draw_help_bar(frame: &mut Frame, area: Rect, app: &App) {
             Span::styled(" Nav ", Style::default().fg(Color::DarkGray)),
             Span::styled("r", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
             Span::styled(" Rand ", Style::default().fg(Color::DarkGray)),
+            Span::styled("f", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(" Fetch ", Style::default().fg(Color::DarkGray)),
             Span::styled("i", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
             Span::styled(" Info ", Style::default().fg(Color::DarkGray)),
+        ]);
+    }
+    // Show 'f' hint on Dashboard even without images if endpoint is configured.
+    if app.active_tab == Tab::Dashboard && !app.has_waifu() && app.cfg.waifu_endpoint().is_some() {
+        keys.extend([
+            Span::styled("f", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(" Fetch ", Style::default().fg(Color::DarkGray)),
         ]);
     }
 
@@ -107,6 +116,14 @@ pub fn draw_help_bar(frame: &mut Frame, area: Rect, app: &App) {
         keys.push(Span::styled(
             " [FROZEN]",
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ));
+    }
+
+    // Show waifu fetch indicator.
+    if app.waifu_fetching {
+        keys.push(Span::styled(
+            " [FETCHING]",
+            Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
         ));
     }
 

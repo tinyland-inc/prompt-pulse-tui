@@ -34,6 +34,8 @@ pub struct CollectorsConfig {
     pub claude: CollectorToggle,
     #[serde(default)]
     pub billing: CollectorToggle,
+    #[serde(default)]
+    pub waifu: WaifuCollectorConfig,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -50,6 +52,16 @@ pub struct ImageConfig {
     pub waifu_enabled: bool,
     #[serde(default)]
     pub waifu_category: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct WaifuCollectorConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub endpoint: String,
+    #[serde(default)]
+    pub category: String,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -90,6 +102,24 @@ impl TuiConfig {
             dirs::cache_dir()
                 .unwrap_or_else(|| PathBuf::from("/tmp"))
                 .join("prompt-pulse")
+        }
+    }
+
+    /// Get the waifu mirror endpoint URL (from collectors.waifu.endpoint).
+    pub fn waifu_endpoint(&self) -> Option<&str> {
+        let ep = &self.collectors.waifu.endpoint;
+        if ep.is_empty() { None } else { Some(ep.as_str()) }
+    }
+
+    /// Get the waifu category (from collectors.waifu.category, fallback to image.waifu_category).
+    pub fn waifu_category(&self) -> &str {
+        let cat = &self.collectors.waifu.category;
+        if !cat.is_empty() {
+            cat
+        } else if !self.image.waifu_category.is_empty() {
+            &self.image.waifu_category
+        } else {
+            "sfw"
         }
     }
 }

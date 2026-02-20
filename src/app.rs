@@ -11,6 +11,8 @@ use crate::config::TuiConfig;
 use crate::data::{self, CacheReader, SysMetrics, TailscaleStatus, ClaudeUsage, BillingReport, K8sStatus};
 use crate::data::claudepersonal::ClaudePersonalReport;
 
+use tokio::sync::mpsc;
+
 /// Maximum number of historical data points for sparklines (~60s at 1s interval).
 const HISTORY_LEN: usize = 60;
 
@@ -141,6 +143,7 @@ pub struct App {
     pub waifu_index: i32,
     pub waifu_show_info: bool,
     pub waifu_name: String,
+    pub waifu_fetching: bool,  // true while an async fetch is in flight
 
     // Claude personal plan usage (read from daemon state file).
     pub claude_personal: Option<ClaudePersonalReport>,
@@ -158,6 +161,10 @@ pub struct App {
     cache_reader: CacheReader,
     last_cache_read: Instant,
     last_sys_refresh: Instant,
+
+    // Channel for receiving live-fetched waifu image paths.
+    waifu_fetch_rx: mpsc::Receiver<PathBuf>,
+    waifu_fetch_tx: mpsc::Sender<PathBuf>,
 }
 
 impl App {
@@ -206,6 +213,9 @@ impl App {
         // Expand mode from CLI flag.
         let expanded = expand_widget.as_deref() == Some("waifu");
 
+        // Channel for async waifu fetch results.
+        let (waifu_fetch_tx, waifu_fetch_rx) = mpsc::channel(4);
+
         // Initialize process system with CPU refresh for usage tracking.
         let mut proc_sys = sysinfo::System::new();
         proc_sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
@@ -248,6 +258,7 @@ impl App {
             waifu_index,
             waifu_show_info: false,
             waifu_name,
+            waifu_fetching: false,
             claude_personal,
             expanded,
             picker,
@@ -256,6 +267,8 @@ impl App {
             cache_reader,
             last_cache_read: Instant::now(),
             last_sys_refresh: Instant::now(),
+            waifu_fetch_rx,
+            waifu_fetch_tx,
         })
     }
 
@@ -314,6 +327,7 @@ impl App {
                 KeyCode::Char('p') => self.waifu_navigate(-1),
                 KeyCode::Char('r') => self.waifu_random(),
                 KeyCode::Char('i') => self.waifu_show_info = !self.waifu_show_info,
+                KeyCode::Char('f') => self.waifu_fetch_live(),
                 _ => {}
             }
             return;
@@ -324,7 +338,15 @@ impl App {
             match key.code {
                 KeyCode::Char('n') => { self.waifu_navigate(1); return; }
                 KeyCode::Char('i') => { self.waifu_show_info = !self.waifu_show_info; return; }
+                KeyCode::Char('f') => { self.waifu_fetch_live(); return; }
                 _ => {}
+            }
+        }
+        // Dashboard tab: 'f' to fetch even when no images loaded yet.
+        if self.active_tab == Tab::Dashboard && !self.has_waifu() {
+            if key.code == KeyCode::Char('f') {
+                self.waifu_fetch_live();
+                return;
             }
         }
 
@@ -455,6 +477,9 @@ impl App {
     /// Called every tick (~250ms). Refresh real-time system data and
     /// periodically re-read daemon cache files.
     pub async fn tick(&mut self) {
+        // Always poll for async fetch results, even when frozen.
+        self.poll_waifu_fetch();
+
         // Skip all data collection when frozen.
         if self.frozen {
             return;
@@ -643,6 +668,44 @@ impl App {
             .unwrap_or(0) as usize;
         let idx = nanos % n;
         self.waifu_load_at(idx);
+    }
+
+    /// Fetch a new random image from the live waifu mirror service.
+    /// Non-blocking: spawns a tokio task, result arrives via channel.
+    pub fn waifu_fetch_live(&mut self) {
+        if self.waifu_fetching {
+            return; // Already fetching.
+        }
+        let endpoint = match self.cfg.waifu_endpoint() {
+            Some(ep) => ep.to_string(),
+            None => return, // No endpoint configured.
+        };
+        let category = self.cfg.waifu_category().to_string();
+        let cache_dir = self.cfg.cache_dir().join("waifu");
+        let tx = self.waifu_fetch_tx.clone();
+        self.waifu_fetching = true;
+
+        tokio::spawn(async move {
+            match data::waifu_client::fetch_random(&endpoint, &category, &cache_dir).await {
+                Ok(path) => { let _ = tx.send(path).await; }
+                Err(e) => { tracing::warn!("waifu fetch failed: {}", e); }
+            }
+        });
+    }
+
+    /// Poll for completed live fetch results (called from tick).
+    fn poll_waifu_fetch(&mut self) {
+        while let Ok(path) = self.waifu_fetch_rx.try_recv() {
+            self.waifu_fetching = false;
+            // Reload the image list and navigate to the new image.
+            self.waifu_images = data::waifu::list_images(&self.cfg);
+            if let Some(idx) = self.waifu_images.iter().position(|p| *p == path) {
+                self.waifu_load_at(idx);
+            } else if !self.waifu_images.is_empty() {
+                // Image might have a different path; load the newest.
+                self.waifu_load_at(self.waifu_images.len() - 1);
+            }
+        }
     }
 
     /// Load the waifu image at the given index.
