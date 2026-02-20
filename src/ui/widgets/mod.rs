@@ -1,0 +1,15 @@
+pub mod tabs;
+pub mod host;
+pub mod cpu;
+pub mod memory;
+pub mod disk;
+pub mod network;
+pub mod tailscale;
+pub mod k8s;
+pub mod claude;
+pub mod billing_widget;
+pub mod waifu;
+pub mod sparkline;
+pub mod processes;
+pub mod help;
+pub mod temperature;

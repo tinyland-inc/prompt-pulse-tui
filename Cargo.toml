@@ -1,0 +1,46 @@
+[package]
+name = "prompt-pulse-tui"
+version = "3.0.0-alpha.1"
+edition = "2021"
+description = "Resizable terminal dashboard with live system metrics, Tailscale status, billing, and waifu image rendering"
+license = "MIT"
+rust-version = "1.75"
+
+[[bin]]
+name = "prompt-pulse-tui"
+path = "src/main.rs"
+
+[dependencies]
+# TUI framework (same stack as btm/bottom)
+ratatui = { version = "0.29", features = ["crossterm"] }
+crossterm = { version = "0.28", features = ["event-stream"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# System metrics (cross-platform CPU/RAM/disk/network)
+sysinfo = "0.32"
+
+# Terminal image rendering (Kitty graphics protocol, Sixel, halfblocks)
+ratatui-image = "3"
+image = "0.25"
+
+# Config and data
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# HTTP client for Tailscale LocalAPI and cloud APIs
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Misc
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
