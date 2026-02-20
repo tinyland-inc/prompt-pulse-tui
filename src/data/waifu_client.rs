@@ -38,7 +38,13 @@ pub async fn fetch_random(endpoint: &str, category: &str, cache_dir: &Path) -> R
     }
 
     // Step 3: Download image bytes.
-    let data = client.get(&meta.url).send().await?.bytes().await?;
+    // The API returns a relative URL (/api/image/...), prepend the endpoint.
+    let image_url = if meta.url.starts_with('/') {
+        format!("{}{}", endpoint, meta.url)
+    } else {
+        meta.url.clone()
+    };
+    let data = client.get(&image_url).send().await?.bytes().await?;
 
     // Step 4: Atomic write to cache.
     std::fs::create_dir_all(cache_dir)?;
