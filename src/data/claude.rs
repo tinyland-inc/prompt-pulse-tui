@@ -4,7 +4,7 @@ use serde::Deserialize;
 /// Mirrors Go claude.UsageReport (daemon cache).
 #[derive(Debug, Deserialize)]
 pub struct ClaudeUsage {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::data::null_to_default")]
     pub accounts: Vec<AccountUsage>,
     #[serde(default)]
     pub total_cost_usd: f64,
@@ -25,9 +25,9 @@ pub struct AccountUsage {
     pub current_month: MonthUsage,
     #[serde(default)]
     pub previous_month: MonthUsage,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::data::null_to_default")]
     pub models: Vec<ModelUsage>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::data::null_to_default")]
     pub workspaces: Vec<WorkspaceUsage>,
     #[serde(default)]
     pub daily_burn_rate: f64,

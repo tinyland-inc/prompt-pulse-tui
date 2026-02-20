@@ -7,7 +7,7 @@ pub struct TailscaleStatus {
     pub self_node: Option<PeerInfo>,
     #[serde(rename = "self")]
     pub self_info: Option<PeerInfo>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::data::null_to_default")]
     pub peers: Vec<PeerInfo>,
     #[serde(default)]
     pub magic_dns_suffix: String,
@@ -30,7 +30,7 @@ pub struct PeerInfo {
     pub dns_name: String,
     #[serde(default)]
     pub os: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::data::null_to_default")]
     pub tailscale_ips: Vec<String>,
     #[serde(default)]
     pub online: bool,
@@ -39,7 +39,7 @@ pub struct PeerInfo {
     pub exit_node: bool,
     #[serde(default)]
     pub exit_node_option: bool,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::data::null_to_default")]
     pub tags: Vec<String>,
     #[serde(default)]
     pub rx_bytes: i64,

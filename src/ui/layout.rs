@@ -91,32 +91,50 @@ pub fn dashboard(frame: &mut Frame, area: Rect, app: &mut App) {
         }
     } else {
         // Narrow: single-column stack.
+        let narrow_waifu = app.wants_waifu();
+        let mut constraints = vec![
+            Constraint::Length(8), // host
+            Constraint::Length(4), // sparklines
+            Constraint::Length(4), // memory
+            Constraint::Length(4), // disks
+        ];
+        if narrow_waifu {
+            constraints.push(Constraint::Length(10)); // waifu
+        }
+        constraints.push(Constraint::Length(6)); // tailscale
+        constraints.push(Constraint::Min(3)); // billing
+
         let rows = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(8), // host
-                Constraint::Length(4), // sparklines
-                Constraint::Length(4), // memory
-                Constraint::Length(4), // disks
-                Constraint::Length(6), // tailscale
-                Constraint::Min(3),    // billing
-            ])
+            .constraints(constraints)
             .split(area);
 
-        widgets::host::draw_host_info(frame, rows[0], app);
+        let mut idx = 0;
+        widgets::host::draw_host_info(frame, rows[idx], app);
+        idx += 1;
 
         // Sparklines in narrow mode too.
         let spark_cols = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-            .split(rows[1]);
+            .split(rows[idx]);
         widgets::sparkline::draw_cpu_sparkline(frame, spark_cols[0], app);
         widgets::sparkline::draw_mem_sparkline(frame, spark_cols[1], app);
+        idx += 1;
 
-        widgets::memory::draw_memory(frame, rows[2], app);
-        widgets::disk::draw_disks(frame, rows[3], app);
-        widgets::tailscale::draw_tailscale(frame, rows[4], app);
-        widgets::billing_widget::draw_billing(frame, rows[5], app);
+        widgets::memory::draw_memory(frame, rows[idx], app);
+        idx += 1;
+        widgets::disk::draw_disks(frame, rows[idx], app);
+        idx += 1;
+
+        if narrow_waifu {
+            widgets::waifu::draw_waifu(frame, rows[idx], app);
+            idx += 1;
+        }
+
+        widgets::tailscale::draw_tailscale(frame, rows[idx], app);
+        idx += 1;
+        widgets::billing_widget::draw_billing(frame, rows[idx], app);
     }
 }
 

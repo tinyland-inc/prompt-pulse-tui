@@ -4,7 +4,7 @@ use serde::Deserialize;
 /// Mirrors Go k8s.ClusterStatus (daemon cache).
 #[derive(Debug, Deserialize)]
 pub struct K8sStatus {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::data::null_to_default")]
     pub clusters: Vec<ClusterInfo>,
     pub timestamp: Option<DateTime<Utc>>,
 }
@@ -17,9 +17,9 @@ pub struct ClusterInfo {
     pub connected: bool,
     #[serde(default)]
     pub error: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::data::null_to_default")]
     pub nodes: Vec<NodeInfo>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::data::null_to_default")]
     pub namespaces: Vec<NamespaceInfo>,
     #[serde(default)]
     pub total_pods: i32,
@@ -37,7 +37,7 @@ pub struct NodeInfo {
     pub name: String,
     #[serde(default)]
     pub ready: bool,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::data::null_to_default")]
     pub roles: Vec<String>,
     #[serde(default)]
     pub cpu_capacity: String,

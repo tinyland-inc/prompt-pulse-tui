@@ -4,7 +4,7 @@ use serde::Deserialize;
 /// Mirrors Go billing.BillingReport (daemon cache).
 #[derive(Debug, Deserialize)]
 pub struct BillingReport {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::data::null_to_default")]
     pub providers: Vec<ProviderBilling>,
     #[serde(default)]
     pub total_monthly_usd: f64,
@@ -27,7 +27,7 @@ pub struct ProviderBilling {
     pub month_to_date: f64,
     #[serde(default)]
     pub balance: f64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "crate::data::null_to_default")]
     pub resources: Vec<ResourceCost>,
 }
 

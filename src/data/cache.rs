@@ -50,6 +50,12 @@ impl CacheReader {
             return None;
         }
         let data = std::fs::read_to_string(&path).ok()?;
-        serde_json::from_str(&data).ok()
+        match serde_json::from_str(&data) {
+            Ok(v) => Some(v),
+            Err(e) => {
+                tracing::warn!("cache {key}.json parse error: {e}");
+                None
+            }
+        }
     }
 }
