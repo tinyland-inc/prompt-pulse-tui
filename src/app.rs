@@ -367,14 +367,22 @@ impl App {
             return;
         }
 
-        // Dashboard tab: waifu navigation keys when waifu is loaded.
-        if self.active_tab == Tab::Dashboard && self.has_waifu() {
+        // Dashboard tab: waifu keys when waifu area is visible.
+        if self.active_tab == Tab::Dashboard && self.wants_waifu() {
             match key.code {
-                KeyCode::Char('n') => {
+                KeyCode::Char('n') if self.has_waifu() => {
                     self.waifu_navigate(1);
                     return;
                 }
-                KeyCode::Char('i') => {
+                KeyCode::Char('p') if self.has_waifu() => {
+                    self.waifu_navigate(-1);
+                    return;
+                }
+                KeyCode::Char('r') if self.has_waifu() => {
+                    self.waifu_random();
+                    return;
+                }
+                KeyCode::Char('i') if self.has_waifu() => {
                     self.waifu_show_info = !self.waifu_show_info;
                     return;
                 }
@@ -384,12 +392,6 @@ impl App {
                 }
                 _ => {}
             }
-        }
-        // Dashboard tab: 'f' to fetch even when no images loaded yet.
-        if self.active_tab == Tab::Dashboard && !self.has_waifu() && key.code == KeyCode::Char('f')
-        {
-            self.waifu_fetch_live();
-            return;
         }
 
         match key.code {
@@ -427,21 +429,9 @@ impl App {
             // n/p/r are context-sensitive: on Dashboard with waifu they're handled above.
             KeyCode::Char('c') => self.process_sort = ProcessSort::Cpu,
             KeyCode::Char('m') => self.process_sort = ProcessSort::Memory,
-            KeyCode::Char('p') => {
-                if self.active_tab == Tab::Dashboard && self.has_waifu() {
-                    self.waifu_navigate(-1);
-                } else {
-                    self.process_sort = ProcessSort::Pid;
-                }
-            }
+            KeyCode::Char('p') => self.process_sort = ProcessSort::Pid,
             KeyCode::Char('n') => self.process_sort = ProcessSort::Name,
-            KeyCode::Char('r') => {
-                if self.active_tab == Tab::Dashboard && self.has_waifu() {
-                    self.waifu_random();
-                } else {
-                    self.sort_reverse = !self.sort_reverse;
-                }
-            }
+            KeyCode::Char('r') => self.sort_reverse = !self.sort_reverse,
             // Page up/down for process table.
             KeyCode::PageDown => {
                 if !self.processes.is_empty() {
@@ -714,6 +704,16 @@ impl App {
     /// Check if a waifu image is loaded (for layout decisions).
     pub fn has_waifu(&self) -> bool {
         self.waifu_state.is_some()
+    }
+
+    /// Whether the waifu widget area should be shown in the layout.
+    /// True when waifu is enabled AND either an image is loaded, a live
+    /// endpoint is configured, or cached images exist on disk.
+    pub fn wants_waifu(&self) -> bool {
+        self.cfg.image.waifu_enabled
+            && (self.waifu_state.is_some()
+                || self.cfg.waifu_endpoint().is_some()
+                || !self.waifu_images.is_empty())
     }
 
     /// Navigate to a waifu image by relative offset (1 = next, -1 = prev).

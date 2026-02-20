@@ -47,7 +47,7 @@ pub fn dashboard(frame: &mut Frame, area: Rect, app: &mut App) {
         widgets::disk::draw_disks(frame, left[4], app);
 
         // Right column.
-        let right_has_waifu = app.has_waifu();
+        let right_has_waifu = app.wants_waifu();
         if right_has_waifu {
             let right = Layout::default()
                 .direction(Direction::Vertical)
