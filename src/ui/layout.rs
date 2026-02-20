@@ -256,6 +256,11 @@ pub fn network(frame: &mut Frame, area: Rect, app: &mut App) {
     widgets::k8s::draw_k8s(frame, chunks[3], app);
 }
 
+/// Build tab: component SHAs, versions, and flake input revisions.
+pub fn build(frame: &mut Frame, area: Rect, app: &mut App) {
+    widgets::buildinfo::draw_build_info(frame, area, app);
+}
+
 /// Billing tab: Claude personal gauge + Claude API usage + cloud billing.
 pub fn billing(frame: &mut Frame, area: Rect, app: &mut App) {
     let chunks = Layout::default()

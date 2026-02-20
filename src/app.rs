@@ -25,10 +25,17 @@ pub enum Tab {
     System,
     Network,
     Billing,
+    Build,
 }
 
 impl Tab {
-    pub const ALL: &[Tab] = &[Tab::Dashboard, Tab::System, Tab::Network, Tab::Billing];
+    pub const ALL: &[Tab] = &[
+        Tab::Dashboard,
+        Tab::System,
+        Tab::Network,
+        Tab::Billing,
+        Tab::Build,
+    ];
 
     pub fn title(&self) -> &str {
         match self {
@@ -36,6 +43,7 @@ impl Tab {
             Tab::System => "System",
             Tab::Network => "Network",
             Tab::Billing => "Billing",
+            Tab::Build => "Build",
         }
     }
 }
@@ -164,6 +172,9 @@ pub struct App {
     last_cache_read: Instant,
     last_sys_refresh: Instant,
 
+    // Build/component version info (read once at startup).
+    pub component_versions: data::buildinfo::ComponentVersions,
+
     // Channel for receiving live-fetched waifu image paths.
     waifu_fetch_rx: mpsc::Receiver<PathBuf>,
     waifu_fetch_tx: mpsc::Sender<PathBuf>,
@@ -219,6 +230,9 @@ impl App {
         // Expand mode from CLI flag.
         let expanded = expand_widget.as_deref() == Some("waifu");
 
+        // Collect build/component version info (once at startup).
+        let component_versions = data::buildinfo::collect_versions(&cfg);
+
         // Channel for async waifu fetch results.
         let (waifu_fetch_tx, waifu_fetch_rx) = mpsc::channel(4);
 
@@ -273,6 +287,7 @@ impl App {
             cache_reader,
             last_cache_read: Instant::now(),
             last_sys_refresh: Instant::now(),
+            component_versions,
             waifu_fetch_rx,
             waifu_fetch_tx,
         })
@@ -378,6 +393,7 @@ impl App {
             KeyCode::Char('2') => self.active_tab = Tab::System,
             KeyCode::Char('3') => self.active_tab = Tab::Network,
             KeyCode::Char('4') => self.active_tab = Tab::Billing,
+            KeyCode::Char('5') => self.active_tab = Tab::Build,
             // Process table navigation (System tab).
             KeyCode::Char('j') | KeyCode::Down => {
                 if !self.processes.is_empty() {

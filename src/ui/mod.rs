@@ -34,6 +34,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Tab::System => layout::system(frame, chunks[1], app),
         Tab::Network => layout::network(frame, chunks[1], app),
         Tab::Billing => layout::billing(frame, chunks[1], app),
+        Tab::Build => layout::build(frame, chunks[1], app),
     }
 
     widgets::help::draw_help_bar(frame, chunks[2], app);
@@ -68,7 +69,7 @@ fn help_tab_tui<'a>() -> Vec<Line<'a>> {
         Line::from(""),
         help_line("Tab / Right", "Next tab"),
         help_line("Shift-Tab / Left", "Previous tab"),
-        help_line("1-4", "Jump to tab"),
+        help_line("1-5", "Jump to tab"),
         help_line("Space", "Freeze/resume data"),
         Line::from(""),
         help_section("Process Table (System tab)"),

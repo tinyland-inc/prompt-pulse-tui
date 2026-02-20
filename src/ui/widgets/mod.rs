@@ -1,4 +1,5 @@
 pub mod billing_widget;
+pub mod buildinfo;
 pub mod claude;
 pub mod claudepersonal;
 pub mod cpu;
