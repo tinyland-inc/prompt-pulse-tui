@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
-use crate::data::{TailscaleStatus, ClaudeUsage, BillingReport, K8sStatus};
 use crate::data::claudepersonal::{self, ClaudePersonalReport, ClaudePersonalState};
+use crate::data::{BillingReport, ClaudeUsage, K8sStatus, TailscaleStatus};
 
 const MAX_CACHE_AGE: Duration = Duration::from_secs(300); // 5 minutes
 
@@ -42,7 +42,11 @@ impl CacheReader {
         let path = self.dir.join(format!("{key}.json"));
         let meta = std::fs::metadata(&path).ok()?;
         let modified = meta.modified().ok()?;
-        if SystemTime::now().duration_since(modified).unwrap_or(Duration::MAX) > MAX_CACHE_AGE {
+        if SystemTime::now()
+            .duration_since(modified)
+            .unwrap_or(Duration::MAX)
+            > MAX_CACHE_AGE
+        {
             return None;
         }
         let data = std::fs::read_to_string(&path).ok()?;

@@ -11,7 +11,9 @@ pub fn draw_tabs(frame: &mut Frame, area: Rect, app: &mut App) {
         .map(|(i, t)| {
             let num = format!("{}", i + 1);
             let style = if *t == app.active_tab {
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(Color::DarkGray)
             };
@@ -37,16 +39,18 @@ pub fn draw_tabs(frame: &mut Frame, area: Rect, app: &mut App) {
             Block::default()
                 .borders(Borders::BOTTOM)
                 .title(format!(" prompt-pulse v3 :: {hostname} "))
-                .title_style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                .title_style(
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )
                 .title_bottom(Line::from(vec![]).right_aligned())
                 .title(
                     Line::from({
-                        let mut spans = vec![
-                            Span::styled(
-                                format!(" {clock} "),
-                                Style::default().fg(Color::DarkGray),
-                            ),
-                        ];
+                        let mut spans = vec![Span::styled(
+                            format!(" {clock} "),
+                            Style::default().fg(Color::DarkGray),
+                        )];
                         if app.refresh_ms != 1000 {
                             spans.push(Span::styled(
                                 format!("{:.1}s ", app.refresh_ms as f64 / 1000.0),

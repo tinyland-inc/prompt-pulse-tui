@@ -12,18 +12,33 @@ pub fn draw_claude(frame: &mut Frame, area: Rect, app: &App) {
     match &app.claude {
         Some(claude) => {
             // Aggregate token counts across all accounts.
-            let total_in: i64 = claude.accounts.iter().map(|a| a.current_month.input_tokens).sum();
-            let total_out: i64 = claude.accounts.iter().map(|a| a.current_month.output_tokens).sum();
+            let total_in: i64 = claude
+                .accounts
+                .iter()
+                .map(|a| a.current_month.input_tokens)
+                .sum();
+            let total_out: i64 = claude
+                .accounts
+                .iter()
+                .map(|a| a.current_month.output_tokens)
+                .sum();
             let token_tag = if total_in > 0 || total_out > 0 {
-                format!(" {}in/{}out", format_tokens(total_in), format_tokens(total_out))
+                format!(
+                    " {}in/{}out",
+                    format_tokens(total_in),
+                    format_tokens(total_out)
+                )
             } else {
                 String::new()
             };
             let title = format!(" Claude (${:.2}{token_tag}) ", claude.total_cost_usd);
 
             if area.height >= 6 && !claude.accounts.is_empty() {
-                let header = Row::new(vec!["Account", "Cost", "Tokens", "Models"])
-                    .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+                let header = Row::new(vec!["Account", "Cost", "Tokens", "Models"]).style(
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                );
 
                 let rows: Vec<Row> = claude
                     .accounts
@@ -42,8 +57,13 @@ pub fn draw_claude(frame: &mut Frame, area: Rect, app: &App) {
                         } else {
                             Color::Red
                         };
-                        let bg = if i % 2 == 1 { Color::Rgb(30, 30, 40) } else { Color::Reset };
-                        let acct_tokens = a.current_month.input_tokens + a.current_month.output_tokens;
+                        let bg = if i % 2 == 1 {
+                            Color::Rgb(30, 30, 40)
+                        } else {
+                            Color::Reset
+                        };
+                        let acct_tokens =
+                            a.current_month.input_tokens + a.current_month.output_tokens;
                         Row::new(vec![
                             a.name.clone(),
                             format!("${:.2}", a.current_month.cost_usd),

@@ -40,7 +40,8 @@ async fn main() -> Result<()> {
 
     // Parse CLI args: --expand <widget-id>
     let args: Vec<String> = std::env::args().collect();
-    let expand_widget = args.windows(2)
+    let expand_widget = args
+        .windows(2)
         .find(|w| w[0] == "--expand")
         .map(|w| w[1].clone());
 
@@ -77,7 +78,10 @@ async fn main() -> Result<()> {
     result
 }
 
-async fn run_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App) -> Result<()> {
+async fn run_loop(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    app: &mut App,
+) -> Result<()> {
     loop {
         terminal.draw(|frame| ui::draw(frame, app))?;
 

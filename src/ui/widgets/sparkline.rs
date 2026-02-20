@@ -7,7 +7,11 @@ use crate::app::App;
 pub fn draw_cpu_sparkline(frame: &mut Frame, area: Rect, app: &App) {
     let data: Vec<u64> = app.cpu_history.iter().map(|v| *v as u64).collect();
     let current = data.last().copied().unwrap_or(0);
-    let avg: u64 = if data.is_empty() { 0 } else { data.iter().sum::<u64>() / data.len() as u64 };
+    let avg: u64 = if data.is_empty() {
+        0
+    } else {
+        data.iter().sum::<u64>() / data.len() as u64
+    };
     let peak = data.iter().copied().max().unwrap_or(0);
     let lo = data.iter().copied().min().unwrap_or(0);
 
@@ -33,7 +37,11 @@ pub fn draw_cpu_sparkline(frame: &mut Frame, area: Rect, app: &App) {
 pub fn draw_mem_sparkline(frame: &mut Frame, area: Rect, app: &App) {
     let data: Vec<u64> = app.mem_history.iter().map(|v| *v as u64).collect();
     let current = data.last().copied().unwrap_or(0);
-    let avg: u64 = if data.is_empty() { 0 } else { data.iter().sum::<u64>() / data.len() as u64 };
+    let avg: u64 = if data.is_empty() {
+        0
+    } else {
+        data.iter().sum::<u64>() / data.len() as u64
+    };
     let peak = data.iter().copied().max().unwrap_or(0);
     let lo = data.iter().copied().min().unwrap_or(0);
 
@@ -132,7 +140,9 @@ pub fn draw_load_sparkline(frame: &mut Frame, area: Rect, app: &App) {
     let cpu_count = snap.cpu_count.max(1) as f64;
 
     // Scale load as percentage of core count (load 1.0 on 8-core = 12.5%).
-    let data: Vec<u64> = app.load_history.iter()
+    let data: Vec<u64> = app
+        .load_history
+        .iter()
         .map(|v| ((v / cpu_count) * 100.0).clamp(0.0, 200.0) as u64)
         .collect();
     let current = app.load_history.back().copied().unwrap_or(0.0);
@@ -176,7 +186,7 @@ pub fn draw_temp_sparkline(frame: &mut Frame, area: Rect, app: &App) {
                 .border_style(Style::default().fg(Color::Blue)),
         )
         .data(&data)
-        .max(110)  // max reasonable temp
+        .max(110) // max reasonable temp
         .style(Style::default().fg(color));
 
     frame.render_widget(sparkline, area);
@@ -236,7 +246,9 @@ pub fn draw_cpu_per_core(frame: &mut Frame, area: Rect, app: &App) {
         let color = pct_gradient(current);
 
         // Show per-core frequency if available.
-        let freq_tag = snap.cpu_freqs.get(core_idx)
+        let freq_tag = snap
+            .cpu_freqs
+            .get(core_idx)
             .filter(|&&f| f > 0)
             .map(|&f| {
                 let ghz = f as f64 / 1000.0;

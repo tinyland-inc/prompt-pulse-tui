@@ -36,7 +36,12 @@ pub fn draw_host_info(frame: &mut Frame, area: Rect, app: &App) {
 
     let mut lines = vec![
         Line::from(vec![
-            Span::styled(&snap.hostname, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                &snap.hostname,
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::raw(" - "),
             Span::styled(&snap.os_name, Style::default().fg(Color::White)),
             Span::raw(" "),
@@ -51,10 +56,7 @@ pub fn draw_host_info(frame: &mut Frame, area: Rect, app: &App) {
                 Style::default().fg(Color::Yellow),
             ),
             Span::raw("  RAM: "),
-            Span::styled(
-                total_ram,
-                Style::default().fg(Color::Yellow),
-            ),
+            Span::styled(total_ram, Style::default().fg(Color::Yellow)),
         ]),
     ];
 
@@ -73,7 +75,11 @@ pub fn draw_host_info(frame: &mut Frame, area: Rect, app: &App) {
         }
         // Show max temperature if available.
         if !snap.temperatures.is_empty() {
-            let max_temp = snap.temperatures.iter().map(|t| t.temp_c).fold(0.0f32, f32::max);
+            let max_temp = snap
+                .temperatures
+                .iter()
+                .map(|t| t.temp_c)
+                .fold(0.0f32, f32::max);
             if max_temp > 0.0 {
                 let temp_color = if max_temp >= 90.0 {
                     Color::Red
@@ -121,7 +127,10 @@ pub fn draw_host_info(frame: &mut Frame, area: Rect, app: &App) {
     ];
     // Memory pressure tag.
     if snap.mem_percent >= 90.0 {
-        ip_spans.push(Span::styled("  MEM!", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)));
+        ip_spans.push(Span::styled(
+            "  MEM!",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ));
     } else if snap.mem_percent >= 80.0 {
         ip_spans.push(Span::styled("  MEM", Style::default().fg(Color::Yellow)));
     }
@@ -137,9 +146,13 @@ pub fn draw_host_info(frame: &mut Frame, area: Rect, app: &App) {
     // Swap tag when active.
     if snap.swap_used > 0 && snap.swap_total > 0 {
         let swap_pct = (snap.swap_used as f64 / snap.swap_total as f64) * 100.0;
-        let swap_color = if swap_pct >= 70.0 { Color::Red }
-            else if swap_pct >= 30.0 { Color::Yellow }
-            else { Color::DarkGray };
+        let swap_color = if swap_pct >= 70.0 {
+            Color::Red
+        } else if swap_pct >= 30.0 {
+            Color::Yellow
+        } else {
+            Color::DarkGray
+        };
         env_spans.push(Span::raw("  Swap: "));
         env_spans.push(Span::styled(
             format!("{:.0}%", swap_pct),
@@ -181,7 +194,10 @@ pub fn draw_host_info(frame: &mut Frame, area: Rect, app: &App) {
             ));
         }
         batt_spans.push(Span::raw("  "));
-        batt_spans.push(Span::styled(&batt.source, Style::default().fg(Color::DarkGray)));
+        batt_spans.push(Span::styled(
+            &batt.source,
+            Style::default().fg(Color::DarkGray),
+        ));
         lines.push(Line::from(batt_spans));
     }
 

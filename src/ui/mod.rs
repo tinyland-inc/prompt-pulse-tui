@@ -54,7 +54,12 @@ fn help_line<'a>(key: &'a str, desc: &'a str) -> Line<'a> {
 
 /// Section header in cyan bold.
 fn help_section(title: &str) -> Line<'_> {
-    Line::from(Span::styled(title, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)))
+    Line::from(Span::styled(
+        title,
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    ))
 }
 
 fn help_tab_tui<'a>() -> Vec<Line<'a>> {
@@ -176,18 +181,27 @@ fn draw_help_overlay(frame: &mut Frame, area: Rect, help_tab: usize) {
 
     // Tab selector line.
     let tab_names = ["TUI", "Shell", "Lab", "Starship"];
-    let tab_spans: Vec<Span> = tab_names.iter().enumerate().map(|(i, name)| {
-        if i == help_tab {
-            Span::styled(format!(" [{}] {} ", i + 1, name), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
-        } else {
-            Span::styled(format!("  {}  {} ", i + 1, name), Style::default().fg(Color::DarkGray))
-        }
-    }).collect();
+    let tab_spans: Vec<Span> = tab_names
+        .iter()
+        .enumerate()
+        .map(|(i, name)| {
+            if i == help_tab {
+                Span::styled(
+                    format!(" [{}] {} ", i + 1, name),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )
+            } else {
+                Span::styled(
+                    format!("  {}  {} ", i + 1, name),
+                    Style::default().fg(Color::DarkGray),
+                )
+            }
+        })
+        .collect();
 
-    let mut lines = vec![
-        Line::from(tab_spans),
-        Line::from(""),
-    ];
+    let mut lines = vec![Line::from(tab_spans), Line::from("")];
 
     // Tab content.
     let content = match help_tab {

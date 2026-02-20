@@ -8,13 +8,21 @@ pub fn draw_disks(frame: &mut Frame, area: Rect, app: &App) {
 
     // Disk space warning: if any disk > 90% or available < 5GB, highlight border.
     let max_pct = snap.disks.iter().map(|d| d.percent).fold(0.0f64, f64::max);
-    let min_avail_gib = snap.disks.iter()
+    let min_avail_gib = snap
+        .disks
+        .iter()
         .map(|d| (d.total.saturating_sub(d.used)) as f64 / (1024.0 * 1024.0 * 1024.0))
         .fold(f64::MAX, f64::min);
     let (border_color, title) = if max_pct >= 95.0 {
-        (Color::Red, format!(" Disks ({}) [!{max_pct:.0}%] ", snap.disks.len()))
+        (
+            Color::Red,
+            format!(" Disks ({}) [!{max_pct:.0}%] ", snap.disks.len()),
+        )
     } else if max_pct >= 85.0 || min_avail_gib < 5.0 {
-        (Color::Yellow, format!(" Disks ({}) [{min_avail_gib:.0}G free] ", snap.disks.len()))
+        (
+            Color::Yellow,
+            format!(" Disks ({}) [{min_avail_gib:.0}G free] ", snap.disks.len()),
+        )
     } else {
         (Color::Blue, format!(" Disks ({}) ", snap.disks.len()))
     };
@@ -61,7 +69,11 @@ pub fn draw_disks(frame: &mut Frame, area: Rect, app: &App) {
         let icon = if disk.is_removable { "\u{23cf} " } else { "" };
 
         let avail = disk.total.saturating_sub(disk.used);
-        let fs_tag = if disk.fs_type.is_empty() { String::new() } else { format!(" [{}]", disk.fs_type) };
+        let fs_tag = if disk.fs_type.is_empty() {
+            String::new()
+        } else {
+            format!(" [{}]", disk.fs_type)
+        };
         let label = format!(
             "{}{}{}: {} / {} ({:.0}%) {} free",
             icon,

@@ -108,7 +108,11 @@ impl TuiConfig {
     /// Get the waifu mirror endpoint URL (from collectors.waifu.endpoint).
     pub fn waifu_endpoint(&self) -> Option<&str> {
         let ep = &self.collectors.waifu.endpoint;
-        if ep.is_empty() { None } else { Some(ep.as_str()) }
+        if ep.is_empty() {
+            None
+        } else {
+            Some(ep.as_str())
+        }
     }
 
     /// Get the waifu category (from collectors.waifu.category, fallback to image.waifu_category).

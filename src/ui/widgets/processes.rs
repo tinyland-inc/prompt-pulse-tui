@@ -1,12 +1,19 @@
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, BorderType, Borders, Cell, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table, TableState};
+use ratatui::widgets::{
+    Block, BorderType, Borders, Cell, Row, Scrollbar, ScrollbarOrientation, ScrollbarState, Table,
+    TableState,
+};
 
 use crate::app::{App, ProcessSort};
 
 pub fn draw_processes(frame: &mut Frame, area: Rect, app: &mut App) {
     let sort_indicator = |col: ProcessSort| -> &str {
         if app.process_sort == col {
-            if app.sort_reverse { " \u{25b2}" } else { " \u{25bc}" }
+            if app.sort_reverse {
+                " \u{25b2}"
+            } else {
+                " \u{25bc}"
+            }
         } else {
             ""
         }
@@ -15,7 +22,11 @@ pub fn draw_processes(frame: &mut Frame, area: Rect, app: &mut App) {
     let name_header = if app.show_cmd { "Cmd" } else { "Name" };
     let header_style = |col: Option<ProcessSort>| -> Style {
         let is_active = col.is_some_and(|c| c == app.process_sort);
-        let fg = if is_active { Color::Yellow } else { Color::Cyan };
+        let fg = if is_active {
+            Color::Yellow
+        } else {
+            Color::Cyan
+        };
         Style::default().fg(fg).add_modifier(Modifier::BOLD)
     };
     let header = Row::new(vec![
@@ -23,8 +34,11 @@ pub fn draw_processes(frame: &mut Frame, area: Rect, app: &mut App) {
         Cell::from(format!("PID{}", sort_indicator(ProcessSort::Pid)))
             .style(header_style(Some(ProcessSort::Pid))),
         Cell::from("User").style(header_style(None)),
-        Cell::from(format!("{name_header}{}", sort_indicator(ProcessSort::Name)))
-            .style(header_style(Some(ProcessSort::Name))),
+        Cell::from(format!(
+            "{name_header}{}",
+            sort_indicator(ProcessSort::Name)
+        ))
+        .style(header_style(Some(ProcessSort::Name))),
         Cell::from(format!("CPU%{}", sort_indicator(ProcessSort::Cpu)))
             .style(header_style(Some(ProcessSort::Cpu))),
         Cell::from(format!("Mem{}", sort_indicator(ProcessSort::Memory)))
@@ -69,7 +83,10 @@ pub fn draw_processes(frame: &mut Frame, area: Rect, app: &mut App) {
             } else {
                 String::new()
             };
-            let name_with_tree = format!("{tree_prefix}{}", truncate_name(display_name, name_max.saturating_sub(tree_prefix.len())));
+            let name_with_tree = format!(
+                "{tree_prefix}{}",
+                truncate_name(display_name, name_max.saturating_sub(tree_prefix.len()))
+            );
             // Highlight filter match in name.
             let name_cell = if !app.process_filter.is_empty() {
                 let lower = name_with_tree.to_lowercase();
@@ -80,7 +97,10 @@ pub fn draw_processes(frame: &mut Frame, area: Rect, app: &mut App) {
                     let after = &name_with_tree[pos + filter.len()..];
                     Cell::from(Line::from(vec![
                         Span::raw(before.to_string()),
-                        Span::styled(matched.to_string(), Style::default().fg(Color::Black).bg(Color::Yellow)),
+                        Span::styled(
+                            matched.to_string(),
+                            Style::default().fg(Color::Black).bg(Color::Yellow),
+                        ),
                         Span::raw(after.to_string()),
                     ]))
                 } else {
@@ -96,7 +116,8 @@ pub fn draw_processes(frame: &mut Frame, area: Rect, app: &mut App) {
                 name_cell,
                 Cell::from(format!("{:.1}", p.cpu_usage)).style(Style::default().fg(cpu_color)),
                 Cell::from(format_mem(p.memory_bytes, total_mem)),
-                Cell::from(format_duration(p.run_time_secs)).style(Style::default().fg(Color::DarkGray)),
+                Cell::from(format_duration(p.run_time_secs))
+                    .style(Style::default().fg(Color::DarkGray)),
             ])
             .style(Style::default().bg(bg))
         })
@@ -114,7 +135,11 @@ pub fn draw_processes(frame: &mut Frame, area: Rect, app: &mut App) {
         Constraint::Length(8),
     ];
 
-    let sort_arrow = if app.sort_reverse { "\u{25b2}" } else { "\u{25bc}" };
+    let sort_arrow = if app.sort_reverse {
+        "\u{25b2}"
+    } else {
+        "\u{25bc}"
+    };
     let sort_name = match app.process_sort {
         ProcessSort::Cpu => "CPU",
         ProcessSort::Memory => "Mem",
@@ -129,16 +154,38 @@ pub fn draw_processes(frame: &mut Frame, area: Rect, app: &mut App) {
     };
     let tree_tag = if app.tree_mode { " tree" } else { "" };
     let visible_cpu: f32 = app.processes.iter().map(|p| p.cpu_usage).sum();
-    let cpu_tag = if visible_cpu >= 1.0 { format!(" {visible_cpu:.0}%") } else { String::new() };
+    let cpu_tag = if visible_cpu >= 1.0 {
+        format!(" {visible_cpu:.0}%")
+    } else {
+        String::new()
+    };
     // Process state counters.
-    let running = app.processes.iter().filter(|p| matches!(p.state, crate::app::ProcessState::Run)).count();
-    let sleeping = app.processes.iter().filter(|p| matches!(p.state, crate::app::ProcessState::Sleep)).count();
-    let zombie = app.processes.iter().filter(|p| matches!(p.state, crate::app::ProcessState::Zombie)).count();
+    let running = app
+        .processes
+        .iter()
+        .filter(|p| matches!(p.state, crate::app::ProcessState::Run))
+        .count();
+    let sleeping = app
+        .processes
+        .iter()
+        .filter(|p| matches!(p.state, crate::app::ProcessState::Sleep))
+        .count();
+    let zombie = app
+        .processes
+        .iter()
+        .filter(|p| matches!(p.state, crate::app::ProcessState::Zombie))
+        .count();
     let state_tag = if running > 0 || zombie > 0 {
         let mut parts = Vec::new();
-        if running > 0 { parts.push(format!("R:{running}")); }
-        if sleeping > 0 { parts.push(format!("S:{sleeping}")); }
-        if zombie > 0 { parts.push(format!("Z:{zombie}")); }
+        if running > 0 {
+            parts.push(format!("R:{running}"));
+        }
+        if sleeping > 0 {
+            parts.push(format!("S:{sleeping}"));
+        }
+        if zombie > 0 {
+            parts.push(format!("Z:{zombie}"));
+        }
         format!(" {}", parts.join(" "))
     } else {
         String::new()
@@ -146,7 +193,10 @@ pub fn draw_processes(frame: &mut Frame, area: Rect, app: &mut App) {
     let title = if app.filter_mode {
         format!(" Processes ({count_label}) [/{}|] ", app.process_filter)
     } else if !app.process_filter.is_empty() {
-        format!(" Processes ({count_label}{cpu_tag}{state_tag}) [filter: {}] ", app.process_filter)
+        format!(
+            " Processes ({count_label}{cpu_tag}{state_tag}) [filter: {}] ",
+            app.process_filter
+        )
     } else {
         format!(" Processes ({count_label}{cpu_tag}{state_tag}) [sort: {sort_name}{sort_arrow}{tree_tag}] ")
     };
@@ -158,7 +208,11 @@ pub fn draw_processes(frame: &mut Frame, area: Rect, app: &mut App) {
         String::new()
     };
 
-    let border_color = if app.filter_mode { Color::Yellow } else { Color::Blue };
+    let border_color = if app.filter_mode {
+        Color::Yellow
+    } else {
+        Color::Blue
+    };
 
     let table = Table::new(rows, widths)
         .header(header)
@@ -167,7 +221,13 @@ pub fn draw_processes(frame: &mut Frame, area: Rect, app: &mut App) {
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .title(title)
-                .title_bottom(Line::from(Span::styled(scroll_tag, Style::default().fg(Color::DarkGray))).right_aligned())
+                .title_bottom(
+                    Line::from(Span::styled(
+                        scroll_tag,
+                        Style::default().fg(Color::DarkGray),
+                    ))
+                    .right_aligned(),
+                )
                 .border_style(Style::default().fg(border_color)),
         )
         .row_highlight_style(
@@ -189,7 +249,10 @@ pub fn draw_processes(frame: &mut Frame, area: Rect, app: &mut App) {
             .end_symbol(None);
         frame.render_stateful_widget(
             scrollbar,
-            area.inner(ratatui::layout::Margin { vertical: 1, horizontal: 0 }),
+            area.inner(ratatui::layout::Margin {
+                vertical: 1,
+                horizontal: 0,
+            }),
             &mut scrollbar_state,
         );
     }
@@ -218,7 +281,11 @@ fn truncate_name(name: &str, max_len: usize) -> String {
 }
 
 fn format_mem(bytes: u64, total: u64) -> String {
-    let pct = if total > 0 { (bytes as f64 / total as f64) * 100.0 } else { 0.0 };
+    let pct = if total > 0 {
+        (bytes as f64 / total as f64) * 100.0
+    } else {
+        0.0
+    };
     if pct >= 1.0 {
         format!("{} {:.0}%", format_bytes(bytes), pct)
     } else {

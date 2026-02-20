@@ -1,7 +1,7 @@
 use ratatui::prelude::*;
 
-use crate::app::App;
 use super::widgets;
+use crate::app::App;
 
 /// Dashboard tab: overview of everything.
 /// Adaptive layout based on terminal width.
@@ -19,11 +19,11 @@ pub fn dashboard(frame: &mut Frame, area: Rect, app: &mut App) {
         let left = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(9),   // host info (hostname, kernel, cpu, uptime, IP/procs, shell, battery)
-                Constraint::Length(5),   // sparklines (CPU + MEM side by side)
-                Constraint::Length(8),   // CPU bars
-                Constraint::Length(6),   // memory
-                Constraint::Min(4),     // disks
+                Constraint::Length(9), // host info (hostname, kernel, cpu, uptime, IP/procs, shell, battery)
+                Constraint::Length(5), // sparklines (CPU + MEM side by side)
+                Constraint::Length(8), // CPU bars
+                Constraint::Length(6), // memory
+                Constraint::Min(4),    // disks
             ])
             .split(cols[0]);
 
@@ -53,7 +53,7 @@ pub fn dashboard(frame: &mut Frame, area: Rect, app: &mut App) {
                 .direction(Direction::Vertical)
                 .constraints([
                     Constraint::Percentage(50), // waifu
-                    Constraint::Length(8),       // tailscale
+                    Constraint::Length(8),      // tailscale
                     Constraint::Min(5),         // billing/claude
                 ])
                 .split(cols[1]);
@@ -72,8 +72,8 @@ pub fn dashboard(frame: &mut Frame, area: Rect, app: &mut App) {
             let right = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Length(10),  // tailscale
-                    Constraint::Length(8),   // k8s
+                    Constraint::Length(10), // tailscale
+                    Constraint::Length(8),  // k8s
                     Constraint::Min(5),     // billing/claude
                 ])
                 .split(cols[1]);
@@ -94,12 +94,12 @@ pub fn dashboard(frame: &mut Frame, area: Rect, app: &mut App) {
         let rows = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(8),   // host
-                Constraint::Length(4),   // sparklines
-                Constraint::Length(4),   // memory
-                Constraint::Length(4),   // disks
-                Constraint::Length(6),   // tailscale
-                Constraint::Min(3),     // billing
+                Constraint::Length(8), // host
+                Constraint::Length(4), // sparklines
+                Constraint::Length(4), // memory
+                Constraint::Length(4), // disks
+                Constraint::Length(6), // tailscale
+                Constraint::Min(3),    // billing
             ])
             .split(area);
 
@@ -134,9 +134,9 @@ pub fn system(frame: &mut Frame, area: Rect, app: &mut App) {
         let left = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(5),   // CPU+MEM sparklines
-                Constraint::Length(14),  // CPU per-core mini sparklines
-                Constraint::Length(6),   // memory + swap
+                Constraint::Length(5),  // CPU+MEM sparklines
+                Constraint::Length(14), // CPU per-core mini sparklines
+                Constraint::Length(6),  // memory + swap
                 Constraint::Min(4),     // disks + temps split
             ])
             .split(cols[0]);
@@ -171,8 +171,8 @@ pub fn system(frame: &mut Frame, area: Rect, app: &mut App) {
         let right = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(5),       // RX+TX sparklines
-                Constraint::Percentage(55),  // processes (scrollable)
+                Constraint::Length(5),      // RX+TX sparklines
+                Constraint::Percentage(55), // processes (scrollable)
                 Constraint::Min(5),         // network table
             ])
             .split(cols[1]);
@@ -192,13 +192,13 @@ pub fn system(frame: &mut Frame, area: Rect, app: &mut App) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(4),   // CPU+MEM+Temp sparklines
-                Constraint::Length(10),  // CPU per-core
-                Constraint::Length(6),   // memory + swap
-                Constraint::Length(4),   // net sparklines
-                Constraint::Length(10),  // processes
-                Constraint::Length(6),   // disks
-                Constraint::Length(6),   // temperatures
+                Constraint::Length(4),  // CPU+MEM+Temp sparklines
+                Constraint::Length(10), // CPU per-core
+                Constraint::Length(6),  // memory + swap
+                Constraint::Length(4),  // net sparklines
+                Constraint::Length(10), // processes
+                Constraint::Length(6),  // disks
+                Constraint::Length(6),  // temperatures
                 Constraint::Min(4),     // network
             ])
             .split(area);
@@ -237,9 +237,9 @@ pub fn network(frame: &mut Frame, area: Rect, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(5),       // net sparklines
-            Constraint::Length(10),      // interface table
-            Constraint::Percentage(40),  // tailscale
+            Constraint::Length(5),      // net sparklines
+            Constraint::Length(10),     // interface table
+            Constraint::Percentage(40), // tailscale
             Constraint::Min(6),         // k8s
         ])
         .split(area);
@@ -261,9 +261,9 @@ pub fn billing(frame: &mut Frame, area: Rect, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(5),       // Claude Personal gauge
-            Constraint::Percentage(45),  // Claude API usage
-            Constraint::Percentage(45),  // Cloud billing
+            Constraint::Length(5),      // Claude Personal gauge
+            Constraint::Percentage(45), // Claude API usage
+            Constraint::Percentage(45), // Cloud billing
         ])
         .split(area);
 

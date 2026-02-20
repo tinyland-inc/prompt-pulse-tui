@@ -16,16 +16,24 @@ pub fn draw_tailscale(frame: &mut Frame, area: Rect, app: &App) {
             let total_rx: i64 = online.iter().map(|p| p.rx_bytes).sum();
             let total_tx: i64 = online.iter().map(|p| p.tx_bytes).sum();
             let bw_tag = if total_rx > 0 || total_tx > 0 {
-                format!(" rx:{} tx:{}", format_bytes(total_rx), format_bytes(total_tx))
+                format!(
+                    " rx:{} tx:{}",
+                    format_bytes(total_rx),
+                    format_bytes(total_tx)
+                )
             } else {
                 String::new()
             };
             let title = format!(
                 " Tailscale - {} ({}/{} online{bw_tag}) ",
-                ts.tailnet_name, online.len(), ts.total_peers
+                ts.tailnet_name,
+                online.len(),
+                ts.total_peers
             );
 
-            let hdr_style = Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+            let hdr_style = Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD);
             let header = Row::new(vec![
                 Cell::from("Host").style(hdr_style),
                 Cell::from("OS").style(hdr_style),
@@ -40,8 +48,13 @@ pub fn draw_tailscale(frame: &mut Frame, area: Rect, app: &App) {
                 .enumerate()
                 .map(|(i, p)| {
                     let ip = p.tailscale_ips.first().cloned().unwrap_or_default();
-                    let bg = if i % 2 == 1 { Color::Rgb(30, 30, 40) } else { Color::Reset };
-                    let seen = p.last_seen
+                    let bg = if i % 2 == 1 {
+                        Color::Rgb(30, 30, 40)
+                    } else {
+                        Color::Reset
+                    };
+                    let seen = p
+                        .last_seen
                         .map(|t| format_relative_time(t))
                         .unwrap_or_else(|| "now".into());
                     let seen_color = if seen == "now" || seen.ends_with('s') {
@@ -56,8 +69,10 @@ pub fn draw_tailscale(frame: &mut Frame, area: Rect, app: &App) {
                         Cell::from(p.os.clone()).style(Style::default().fg(Color::Gray)),
                         Cell::from(ip).style(Style::default().fg(Color::Cyan)),
                         Cell::from(seen).style(Style::default().fg(seen_color)),
-                        Cell::from(format_bytes(p.rx_bytes)).style(Style::default().fg(Color::DarkGray)),
-                        Cell::from(format_bytes(p.tx_bytes)).style(Style::default().fg(Color::DarkGray)),
+                        Cell::from(format_bytes(p.rx_bytes))
+                            .style(Style::default().fg(Color::DarkGray)),
+                        Cell::from(format_bytes(p.tx_bytes))
+                            .style(Style::default().fg(Color::DarkGray)),
                     ])
                     .style(Style::default().bg(bg))
                 })

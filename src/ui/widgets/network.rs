@@ -7,11 +7,31 @@ pub fn draw_network(frame: &mut Frame, area: Rect, app: &App) {
     let snap = app.sys.snapshot();
 
     let header = Row::new(vec![
-        Cell::from("Interface").style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Cell::from("RX/s").style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Cell::from("TX/s").style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Cell::from("Total RX").style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Cell::from("Total TX").style(Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Cell::from("Interface").style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Cell::from("RX/s").style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Cell::from("TX/s").style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Cell::from("Total RX").style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Cell::from("Total TX").style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
     ]);
 
     let mut rows: Vec<Row> = snap
@@ -21,7 +41,11 @@ pub fn draw_network(frame: &mut Frame, area: Rect, app: &App) {
         .map(|(i, n)| {
             let rx_color = rate_color(n.rx_rate);
             let tx_color = rate_color(n.tx_rate);
-            let bg = if i % 2 == 1 { Color::Rgb(30, 30, 40) } else { Color::Reset };
+            let bg = if i % 2 == 1 {
+                Color::Rgb(30, 30, 40)
+            } else {
+                Color::Reset
+            };
             let kind_color = match n.kind {
                 crate::data::sysmetrics::NetKind::Wifi => Color::Cyan,
                 crate::data::sysmetrics::NetKind::Ethernet => Color::Green,
@@ -29,16 +53,27 @@ pub fn draw_network(frame: &mut Frame, area: Rect, app: &App) {
                 crate::data::sysmetrics::NetKind::Unknown => Color::DarkGray,
             };
             // Trend arrows based on activity level.
-            let rx_arrow = if n.rx_rate >= 1024 * 1024 { "\u{25b2}" }
-                else if n.rx_rate >= 1024 { "\u{25b3}" }
-                else { "" };
-            let tx_arrow = if n.tx_rate >= 1024 * 1024 { "\u{25b2}" }
-                else if n.tx_rate >= 1024 { "\u{25b3}" }
-                else { "" };
+            let rx_arrow = if n.rx_rate >= 1024 * 1024 {
+                "\u{25b2}"
+            } else if n.rx_rate >= 1024 {
+                "\u{25b3}"
+            } else {
+                ""
+            };
+            let tx_arrow = if n.tx_rate >= 1024 * 1024 {
+                "\u{25b2}"
+            } else if n.tx_rate >= 1024 {
+                "\u{25b3}"
+            } else {
+                ""
+            };
             Row::new(vec![
-                Cell::from(format!("{} {}", n.kind.icon(), n.name)).style(Style::default().fg(kind_color)),
-                Cell::from(format!("{}{rx_arrow}", format_rate(n.rx_rate))).style(Style::default().fg(rx_color)),
-                Cell::from(format!("{}{tx_arrow}", format_rate(n.tx_rate))).style(Style::default().fg(tx_color)),
+                Cell::from(format!("{} {}", n.kind.icon(), n.name))
+                    .style(Style::default().fg(kind_color)),
+                Cell::from(format!("{}{rx_arrow}", format_rate(n.rx_rate)))
+                    .style(Style::default().fg(rx_color)),
+                Cell::from(format!("{}{tx_arrow}", format_rate(n.tx_rate)))
+                    .style(Style::default().fg(tx_color)),
                 Cell::from(format_bytes(n.rx_bytes)).style(Style::default().fg(Color::DarkGray)),
                 Cell::from(format_bytes(n.tx_bytes)).style(Style::default().fg(Color::DarkGray)),
             ])
@@ -55,12 +90,20 @@ pub fn draw_network(frame: &mut Frame, area: Rect, app: &App) {
         rows.push(
             Row::new(vec![
                 Cell::from("TOTAL").style(Style::default().add_modifier(Modifier::BOLD)),
-                Cell::from(format_rate(total_rx_rate)).style(Style::default().fg(rate_color(total_rx_rate)).add_modifier(Modifier::BOLD)),
-                Cell::from(format_rate(total_tx_rate)).style(Style::default().fg(rate_color(total_tx_rate)).add_modifier(Modifier::BOLD)),
+                Cell::from(format_rate(total_rx_rate)).style(
+                    Style::default()
+                        .fg(rate_color(total_rx_rate))
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Cell::from(format_rate(total_tx_rate)).style(
+                    Style::default()
+                        .fg(rate_color(total_tx_rate))
+                        .add_modifier(Modifier::BOLD),
+                ),
                 Cell::from(format_bytes(total_rx)).style(Style::default().fg(Color::Gray)),
                 Cell::from(format_bytes(total_tx)).style(Style::default().fg(Color::Gray)),
             ])
-            .style(Style::default().bg(Color::Rgb(40, 40, 50)))
+            .style(Style::default().bg(Color::Rgb(40, 40, 50))),
         );
     }
 
@@ -77,7 +120,11 @@ pub fn draw_network(frame: &mut Frame, area: Rect, app: &App) {
     let total_tx_rate: u64 = snap.networks.iter().map(|n| n.tx_rate).sum();
     let max_rate = total_rx_rate.max(total_tx_rate);
     let net_title = if total_rx_rate > 0 || total_tx_rate > 0 {
-        format!(" Network [rx:{} tx:{}] ", format_rate(total_rx_rate), format_rate(total_tx_rate))
+        format!(
+            " Network [rx:{} tx:{}] ",
+            format_rate(total_rx_rate),
+            format_rate(total_tx_rate)
+        )
     } else {
         format!(" Network ({}) ", snap.networks.len())
     };
@@ -89,15 +136,13 @@ pub fn draw_network(frame: &mut Frame, area: Rect, app: &App) {
         Color::Blue
     };
 
-    let table = Table::new(rows, widths)
-        .header(header)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .title(net_title)
-                .border_style(Style::default().fg(border_color)),
-        );
+    let table = Table::new(rows, widths).header(header).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .title(net_title)
+            .border_style(Style::default().fg(border_color)),
+    );
 
     frame.render_widget(table, area);
 }

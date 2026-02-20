@@ -6,11 +6,21 @@ use crate::app::App;
 pub fn draw_temperatures(frame: &mut Frame, area: Rect, app: &App) {
     let snap = app.sys.snapshot();
 
-    let max_temp = snap.temperatures.iter().map(|t| t.temp_c).fold(0.0f32, f32::max);
-    let avg_temp = if snap.temperatures.is_empty() { 0.0 } else {
+    let max_temp = snap
+        .temperatures
+        .iter()
+        .map(|t| t.temp_c)
+        .fold(0.0f32, f32::max);
+    let avg_temp = if snap.temperatures.is_empty() {
+        0.0
+    } else {
         snap.temperatures.iter().map(|t| t.temp_c).sum::<f32>() / snap.temperatures.len() as f32
     };
-    let border_color = if max_temp >= 85.0 { Color::Red } else { Color::Blue };
+    let border_color = if max_temp >= 85.0 {
+        Color::Red
+    } else {
+        Color::Blue
+    };
     let title = if max_temp >= 85.0 {
         format!(" Temps ({}) [!{max_temp:.0}°C] ", snap.temperatures.len())
     } else if !snap.temperatures.is_empty() {

@@ -23,8 +23,12 @@ pub struct PersonalMessage {
     pub source: String,
 }
 
-fn default_window_hours() -> i32 { 5 }
-fn default_message_limit() -> i32 { 45 }
+fn default_window_hours() -> i32 {
+    5
+}
+fn default_message_limit() -> i32 {
+    45
+}
 
 /// Computed report for the TUI widget.
 #[derive(Debug, Clone)]

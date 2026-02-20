@@ -60,10 +60,8 @@ pub fn load_image(path: &Path) -> Result<DynamicImage> {
 /// Format an image filename as a human-readable name.
 /// Strips directory and extension, replaces `_` and `-` with spaces.
 pub fn format_image_name(path: &Path) -> String {
-    let stem = path.file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("");
-    stem.replace('_', " ").replace('-', " ")
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    stem.replace(['_', '-'], " ")
 }
 
 fn is_image_file(path: &Path) -> bool {
@@ -75,7 +73,10 @@ fn is_image_file(path: &Path) -> bool {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
-    matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "img")
+    matches!(
+        ext.as_str(),
+        "png" | "jpg" | "jpeg" | "webp" | "gif" | "img"
+    )
 }
 
 fn waifu_cache_dir(cfg: &TuiConfig) -> PathBuf {

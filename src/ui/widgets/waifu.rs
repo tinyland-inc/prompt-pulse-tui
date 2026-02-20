@@ -6,7 +6,11 @@ use crate::app::App;
 
 pub fn draw_waifu(frame: &mut Frame, area: Rect, app: &mut App) {
     let protocol_name = format!("{:?}", app.picker.protocol_type());
-    let live = if app.cfg.waifu_endpoint().is_some() { " Live" } else { "" };
+    let live = if app.cfg.waifu_endpoint().is_some() {
+        " Live"
+    } else {
+        ""
+    };
     let fetch_indicator = if app.waifu_fetching { " ..." } else { "" };
     let title = if !app.waifu_images.is_empty() && app.waifu_index >= 0 {
         format!(
@@ -35,14 +39,14 @@ pub fn draw_waifu(frame: &mut Frame, area: Rect, app: &mut App) {
 
                 // Info overlay: show formatted filename on bottom line.
                 if app.waifu_show_info && !app.waifu_name.is_empty() && inner.height > 1 {
-                    let overlay_area = Rect::new(
-                        inner.x,
-                        inner.y + inner.height - 1,
-                        inner.width,
-                        1,
+                    let overlay_area =
+                        Rect::new(inner.x, inner.y + inner.height - 1, inner.width, 1);
+                    let overlay = Paragraph::new(app.waifu_name.as_str()).style(
+                        Style::default()
+                            .fg(Color::White)
+                            .bg(Color::Black)
+                            .add_modifier(Modifier::DIM),
                     );
-                    let overlay = Paragraph::new(app.waifu_name.as_str())
-                        .style(Style::default().fg(Color::White).bg(Color::Black).add_modifier(Modifier::DIM));
                     frame.render_widget(overlay, overlay_area);
                 }
             }

@@ -8,8 +8,10 @@ use ratatui_image::picker::Picker;
 use ratatui_image::protocol::StatefulProtocol;
 
 use crate::config::TuiConfig;
-use crate::data::{self, CacheReader, SysMetrics, TailscaleStatus, ClaudeUsage, BillingReport, K8sStatus};
 use crate::data::claudepersonal::ClaudePersonalReport;
+use crate::data::{
+    self, BillingReport, CacheReader, ClaudeUsage, K8sStatus, SysMetrics, TailscaleStatus,
+};
 
 use tokio::sync::mpsc;
 
@@ -49,7 +51,7 @@ pub struct ProcessInfo {
     pub memory_bytes: u64,
     pub state: ProcessState,
     pub run_time_secs: u64,
-    pub tree_depth: usize,  // 0 = root, 1+ = child depth
+    pub tree_depth: usize, // 0 = root, 1+ = child depth
 }
 
 /// Process running state.
@@ -90,7 +92,7 @@ pub struct App {
     pub term_width: u16,
     pub term_height: u16,
     pub show_help: bool,
-    pub help_tab: usize,  // 0=TUI, 1=Shell, 2=Lab, 3=Starship
+    pub help_tab: usize, // 0=TUI, 1=Shell, 2=Lab, 3=Starship
     pub frozen: bool,
 
     // Process filter (btm-style '/' search).
@@ -117,17 +119,17 @@ pub struct App {
     pub net_rx_history: VecDeque<f64>,
     pub net_tx_history: VecDeque<f64>,
     pub load_history: VecDeque<f64>,
-    pub temp_history: VecDeque<f64>,  // max temperature over last 60s
+    pub temp_history: VecDeque<f64>, // max temperature over last 60s
 
     // Process kill: double-d (btm-style) confirmation.
-    pub pending_kill: Option<Instant>,  // timestamp of first 'd' press
+    pub pending_kill: Option<Instant>, // timestamp of first 'd' press
 
     // Top processes by CPU usage.
     pub processes: Vec<ProcessInfo>,
     pub process_sort: ProcessSort,
     pub sort_reverse: bool,
     pub process_scroll: usize,
-    pub total_process_count: usize,  // unfiltered count for title display
+    pub total_process_count: usize, // unfiltered count for title display
 
     // Cached data from Go daemon.
     pub tailscale: Option<TailscaleStatus>,
@@ -143,7 +145,7 @@ pub struct App {
     pub waifu_index: i32,
     pub waifu_show_info: bool,
     pub waifu_name: String,
-    pub waifu_fetching: bool,  // true while an async fetch is in flight
+    pub waifu_fetching: bool, // true while an async fetch is in flight
 
     // Claude personal plan usage (read from daemon state file).
     pub claude_personal: Option<ClaudePersonalReport>,
@@ -168,7 +170,11 @@ pub struct App {
 }
 
 impl App {
-    pub async fn new(cfg: TuiConfig, mut picker: Picker, expand_widget: Option<String>) -> Result<Self> {
+    pub async fn new(
+        cfg: TuiConfig,
+        mut picker: Picker,
+        expand_widget: Option<String>,
+    ) -> Result<Self> {
         let cache_reader = CacheReader::new(cfg.cache_dir());
         let sys = SysMetrics::collect();
 
@@ -314,7 +320,7 @@ impl App {
                 KeyCode::Char('2') => self.help_tab = 1,
                 KeyCode::Char('3') => self.help_tab = 2,
                 KeyCode::Char('4') => self.help_tab = 3,
-                _ => self.show_help = false,  // Any other key dismisses
+                _ => self.show_help = false, // Any other key dismisses
             }
             return;
         }
@@ -336,18 +342,26 @@ impl App {
         // Dashboard tab: waifu navigation keys when waifu is loaded.
         if self.active_tab == Tab::Dashboard && self.has_waifu() {
             match key.code {
-                KeyCode::Char('n') => { self.waifu_navigate(1); return; }
-                KeyCode::Char('i') => { self.waifu_show_info = !self.waifu_show_info; return; }
-                KeyCode::Char('f') => { self.waifu_fetch_live(); return; }
+                KeyCode::Char('n') => {
+                    self.waifu_navigate(1);
+                    return;
+                }
+                KeyCode::Char('i') => {
+                    self.waifu_show_info = !self.waifu_show_info;
+                    return;
+                }
+                KeyCode::Char('f') => {
+                    self.waifu_fetch_live();
+                    return;
+                }
                 _ => {}
             }
         }
         // Dashboard tab: 'f' to fetch even when no images loaded yet.
-        if self.active_tab == Tab::Dashboard && !self.has_waifu() {
-            if key.code == KeyCode::Char('f') {
-                self.waifu_fetch_live();
-                return;
-            }
+        if self.active_tab == Tab::Dashboard && !self.has_waifu() && key.code == KeyCode::Char('f')
+        {
+            self.waifu_fetch_live();
+            return;
         }
 
         match key.code {
@@ -367,7 +381,8 @@ impl App {
             // Process table navigation (System tab).
             KeyCode::Char('j') | KeyCode::Down => {
                 if !self.processes.is_empty() {
-                    self.process_scroll = (self.process_scroll + 1).min(self.processes.len().saturating_sub(1));
+                    self.process_scroll =
+                        (self.process_scroll + 1).min(self.processes.len().saturating_sub(1));
                 }
             }
             KeyCode::Char('k') | KeyCode::Up => {
@@ -401,7 +416,8 @@ impl App {
             // Page up/down for process table.
             KeyCode::PageDown => {
                 if !self.processes.is_empty() {
-                    self.process_scroll = (self.process_scroll + 10).min(self.processes.len().saturating_sub(1));
+                    self.process_scroll =
+                        (self.process_scroll + 10).min(self.processes.len().saturating_sub(1));
                 }
             }
             KeyCode::PageUp => {
@@ -445,7 +461,8 @@ impl App {
         match mouse.kind {
             MouseEventKind::ScrollDown => {
                 if self.active_tab == Tab::System && !self.processes.is_empty() {
-                    self.process_scroll = (self.process_scroll + 3).min(self.processes.len().saturating_sub(1));
+                    self.process_scroll =
+                        (self.process_scroll + 3).min(self.processes.len().saturating_sub(1));
                 }
             }
             MouseEventKind::ScrollUp => {
@@ -500,7 +517,8 @@ impl App {
 
             // Per-core history.
             if self.cpu_per_core_history.len() != snap.cpu_usage.len() {
-                self.cpu_per_core_history = vec![VecDeque::with_capacity(HISTORY_LEN); snap.cpu_usage.len()];
+                self.cpu_per_core_history =
+                    vec![VecDeque::with_capacity(HISTORY_LEN); snap.cpu_usage.len()];
             }
             for (i, &usage) in snap.cpu_usage.iter().enumerate() {
                 if self.cpu_per_core_history[i].len() >= HISTORY_LEN {
@@ -532,7 +550,9 @@ impl App {
             self.load_history.push_back(snap.load_avg[0]);
 
             // Record max temperature for sparkline.
-            let max_temp = snap.temperatures.iter()
+            let max_temp = snap
+                .temperatures
+                .iter()
                 .map(|t| t.temp_c)
                 .fold(0.0f32, f32::max);
             if self.temp_history.len() >= HISTORY_LEN {
@@ -553,26 +573,40 @@ impl App {
             self.net_tx_history.push_back(total_tx as f64);
 
             // Refresh process list and collect top 50 (scrollable).
-            self.proc_sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
-            self.total_process_count = self.proc_sys.processes()
+            self.proc_sys
+                .refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+            self.total_process_count = self
+                .proc_sys
+                .processes()
                 .values()
                 .filter(|p| p.cpu_usage() > 0.0)
                 .count();
             let filter_lower = self.process_filter.to_lowercase();
-            let mut procs: Vec<ProcessInfo> = self.proc_sys.processes()
+            let mut procs: Vec<ProcessInfo> = self
+                .proc_sys
+                .processes()
                 .values()
                 .filter(|p| p.cpu_usage() > 0.0)
                 .filter(|p| {
                     if filter_lower.is_empty() {
                         true
                     } else {
-                        p.name().to_string_lossy().to_lowercase().contains(&filter_lower)
+                        p.name()
+                            .to_string_lossy()
+                            .to_lowercase()
+                            .contains(&filter_lower)
                             || p.pid().as_u32().to_string().contains(&filter_lower)
-                            || p.cmd().iter().any(|s| s.to_string_lossy().to_lowercase().contains(&filter_lower))
+                            || p.cmd()
+                                .iter()
+                                .any(|s| s.to_string_lossy().to_lowercase().contains(&filter_lower))
                     }
                 })
                 .map(|p| {
-                    let cmd_parts: Vec<String> = p.cmd().iter().map(|s| s.to_string_lossy().to_string()).collect();
+                    let cmd_parts: Vec<String> = p
+                        .cmd()
+                        .iter()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .collect();
                     let cmd = if cmd_parts.is_empty() {
                         p.name().to_string_lossy().to_string()
                     } else {
@@ -585,11 +619,14 @@ impl App {
                         sysinfo::ProcessStatus::Zombie => ProcessState::Zombie,
                         _ => ProcessState::Unknown,
                     };
-                    let user = p.user_id()
-                        .and_then(|uid| self.users
-                            .iter()
-                            .find(|u| u.id() == uid)
-                            .map(|u| u.name().to_string()))
+                    let user = p
+                        .user_id()
+                        .and_then(|uid| {
+                            self.users
+                                .iter()
+                                .find(|u| u.id() == uid)
+                                .map(|u| u.name().to_string())
+                        })
                         .unwrap_or_default();
                     ProcessInfo {
                         pid: p.pid().as_u32(),
@@ -606,10 +643,16 @@ impl App {
                 })
                 .collect();
             match self.process_sort {
-                ProcessSort::Cpu => procs.sort_by(|a, b| b.cpu_usage.partial_cmp(&a.cpu_usage).unwrap_or(std::cmp::Ordering::Equal)),
+                ProcessSort::Cpu => procs.sort_by(|a, b| {
+                    b.cpu_usage
+                        .partial_cmp(&a.cpu_usage)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                }),
                 ProcessSort::Memory => procs.sort_by(|a, b| b.memory_bytes.cmp(&a.memory_bytes)),
                 ProcessSort::Pid => procs.sort_by(|a, b| a.pid.cmp(&b.pid)),
-                ProcessSort::Name => procs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
+                ProcessSort::Name => {
+                    procs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+                }
             }
             if self.sort_reverse {
                 procs.reverse();
@@ -650,7 +693,11 @@ impl App {
         if n == 0 {
             return;
         }
-        let base = if self.waifu_index >= 0 { self.waifu_index } else { 0 };
+        let base = if self.waifu_index >= 0 {
+            self.waifu_index
+        } else {
+            0
+        };
         let new_idx = ((base + delta) % n + n) % n;
         self.waifu_load_at(new_idx as usize);
     }
@@ -687,8 +734,12 @@ impl App {
 
         tokio::spawn(async move {
             match data::waifu_client::fetch_random(&endpoint, &category, &cache_dir).await {
-                Ok(path) => { let _ = tx.send(path).await; }
-                Err(e) => { tracing::warn!("waifu fetch failed: {}", e); }
+                Ok(path) => {
+                    let _ = tx.send(path).await;
+                }
+                Err(e) => {
+                    tracing::warn!("waifu fetch failed: {}", e);
+                }
             }
         });
     }
@@ -727,9 +778,9 @@ impl App {
             let pid = sysinfo::Pid::from_u32(proc_info.pid);
             if let Some(process) = self.proc_sys.process(pid) {
                 if force {
-                    process.kill();  // SIGKILL
+                    process.kill(); // SIGKILL
                 } else {
-                    process.kill_with(sysinfo::Signal::Term);  // SIGTERM
+                    process.kill_with(sysinfo::Signal::Term); // SIGTERM
                 }
             }
         }
@@ -748,7 +799,9 @@ impl App {
         }
 
         // Find roots (ppid not in our set, or ppid == 0).
-        let roots: Vec<usize> = procs.iter().enumerate()
+        let roots: Vec<usize> = procs
+            .iter()
+            .enumerate()
             .filter(|(_, p)| p.ppid == 0 || !pids.contains(&p.ppid))
             .map(|(i, _)| i)
             .collect();
@@ -790,8 +843,9 @@ impl App {
 
         // Reorder procs by tree order and set depth.
         // We need to move items out without borrow issues, so use indices.
-        let ordered: Vec<ProcessInfo> = result.into_iter().map(|(idx, depth)| {
-            ProcessInfo {
+        let ordered: Vec<ProcessInfo> = result
+            .into_iter()
+            .map(|(idx, depth)| ProcessInfo {
                 pid: procs[idx].pid,
                 ppid: procs[idx].ppid,
                 name: std::mem::take(&mut procs[idx].name),
@@ -802,8 +856,8 @@ impl App {
                 state: procs[idx].state,
                 run_time_secs: procs[idx].run_time_secs,
                 tree_depth: depth,
-            }
-        }).collect();
+            })
+            .collect();
 
         ordered
     }

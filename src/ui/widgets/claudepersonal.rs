@@ -23,10 +23,7 @@ pub fn draw_claude_personal(frame: &mut Frame, area: Rect, app: &App) {
                 Color::Green
             };
             let remaining = (report.message_limit - report.messages_in_window).max(0);
-            let mut status = format!(
-                "{} remaining in {}h window",
-                remaining, report.window_hours
-            );
+            let mut status = format!("{} remaining in {}h window", remaining, report.window_hours);
             if report.next_slot_secs > 0 {
                 let hours = report.next_slot_secs / 3600;
                 let mins = (report.next_slot_secs % 3600) / 60;
@@ -40,7 +37,12 @@ pub fn draw_claude_personal(frame: &mut Frame, area: Rect, app: &App) {
         }
         None => {
             let title = " Claude Pro ".to_string();
-            (title, 0.0, Color::DarkGray, "Scanning sessions...".to_string())
+            (
+                title,
+                0.0,
+                Color::DarkGray,
+                "Scanning sessions...".to_string(),
+            )
         }
     };
 
@@ -70,8 +72,7 @@ pub fn draw_claude_personal(frame: &mut Frame, area: Rect, app: &App) {
         frame.render_widget(gauge, chunks[0]);
 
         if chunks[1].height > 0 {
-            let status = Paragraph::new(status_text)
-                .style(Style::default().fg(Color::Gray));
+            let status = Paragraph::new(status_text).style(Style::default().fg(Color::Gray));
             frame.render_widget(status, chunks[1]);
         }
     } else {

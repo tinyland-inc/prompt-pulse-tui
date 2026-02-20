@@ -7,7 +7,12 @@ pub fn draw_help_bar(frame: &mut Frame, area: Rect, app: &App) {
     // Filter mode: show filter input prompt.
     if app.filter_mode {
         let line = Line::from(vec![
-            Span::styled(" /", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                " /",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(&app.process_filter, Style::default().fg(Color::White)),
             Span::styled("|", Style::default().fg(Color::Yellow)),
             Span::styled("  Enter", Style::default().fg(Color::DarkGray)),
@@ -20,31 +25,71 @@ pub fn draw_help_bar(frame: &mut Frame, area: Rect, app: &App) {
     }
 
     let mut keys = vec![
-        Span::styled(" q", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            " q",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Quit ", Style::default().fg(Color::DarkGray)),
-        Span::styled("Tab", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Tab",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Next ", Style::default().fg(Color::DarkGray)),
-        Span::styled("1-4", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "1-4",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Jump ", Style::default().fg(Color::DarkGray)),
     ];
 
     // Context-sensitive hints for Dashboard tab (waifu nav).
     if app.active_tab == Tab::Dashboard && app.has_waifu() {
         keys.extend([
-            Span::styled("n/p", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "n/p",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Nav ", Style::default().fg(Color::DarkGray)),
-            Span::styled("r", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "r",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Rand ", Style::default().fg(Color::DarkGray)),
-            Span::styled("f", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "f",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Fetch ", Style::default().fg(Color::DarkGray)),
-            Span::styled("i", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "i",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Info ", Style::default().fg(Color::DarkGray)),
         ]);
     }
     // Show 'f' hint on Dashboard even without images if endpoint is configured.
     if app.active_tab == Tab::Dashboard && !app.has_waifu() && app.cfg.waifu_endpoint().is_some() {
         keys.extend([
-            Span::styled("f", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "f",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Fetch ", Style::default().fg(Color::DarkGray)),
         ]);
     }
@@ -52,29 +97,79 @@ pub fn draw_help_bar(frame: &mut Frame, area: Rect, app: &App) {
     // Context-sensitive hints for System tab.
     if app.active_tab == Tab::System {
         keys.extend([
-            Span::styled("j/k", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "j/k",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Scroll ", Style::default().fg(Color::DarkGray)),
-            Span::styled("/", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "/",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Filter ", Style::default().fg(Color::DarkGray)),
-            Span::styled("c/m/p/n", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "c/m/p/n",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Sort ", Style::default().fg(Color::DarkGray)),
-            Span::styled("r", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "r",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Rev ", Style::default().fg(Color::DarkGray)),
-            Span::styled("e", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "e",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Expand ", Style::default().fg(Color::DarkGray)),
-            Span::styled("t", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "t",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Tree ", Style::default().fg(Color::DarkGray)),
-            Span::styled("dd", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "dd",
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" Kill ", Style::default().fg(Color::DarkGray)),
         ]);
     }
 
     keys.extend([
-        Span::styled("+/-", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "+/-",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Speed ", Style::default().fg(Color::DarkGray)),
-        Span::styled("Space", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "Space",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Freeze ", Style::default().fg(Color::DarkGray)),
-        Span::styled("?", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "?",
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::styled(" Help", Style::default().fg(Color::DarkGray)),
     ]);
 
@@ -99,16 +194,10 @@ pub fn draw_help_bar(frame: &mut Frame, area: Rect, app: &App) {
 
     // Mode indicators.
     if app.tree_mode {
-        keys.push(Span::styled(
-            " [TREE]",
-            Style::default().fg(Color::Cyan),
-        ));
+        keys.push(Span::styled(" [TREE]", Style::default().fg(Color::Cyan)));
     }
     if app.show_cmd {
-        keys.push(Span::styled(
-            " [CMD]",
-            Style::default().fg(Color::Cyan),
-        ));
+        keys.push(Span::styled(" [CMD]", Style::default().fg(Color::Cyan)));
     }
 
     // Show frozen indicator.
@@ -123,7 +212,9 @@ pub fn draw_help_bar(frame: &mut Frame, area: Rect, app: &App) {
     if app.waifu_fetching {
         keys.push(Span::styled(
             " [FETCHING]",
-            Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
         ));
     }
 

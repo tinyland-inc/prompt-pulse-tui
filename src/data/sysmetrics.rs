@@ -1,5 +1,7 @@
 use std::collections::HashMap;
-use sysinfo::{Components, CpuRefreshKind, Disks, MemoryRefreshKind, Networks, RefreshKind, System};
+use sysinfo::{
+    Components, CpuRefreshKind, Disks, MemoryRefreshKind, Networks, RefreshKind, System,
+};
 
 /// Real-time system metrics collected in-process (not from daemon cache).
 pub struct SysMetrics {
@@ -49,7 +51,7 @@ pub struct TempInfo {
 pub struct BatteryInfo {
     pub percent: f32,
     pub charging: bool,
-    pub source: String, // "AC Power" or "Battery Power"
+    pub source: String,                 // "AC Power" or "Battery Power"
     pub time_remaining: Option<String>, // e.g. "2:30" or "calculating"
 }
 
@@ -67,8 +69,8 @@ pub struct NetInfo {
     pub kind: NetKind,
     pub rx_bytes: u64,
     pub tx_bytes: u64,
-    pub rx_rate: u64,  // bytes/sec since last refresh
-    pub tx_rate: u64,  // bytes/sec since last refresh
+    pub rx_rate: u64, // bytes/sec since last refresh
+    pub tx_rate: u64, // bytes/sec since last refresh
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -98,7 +100,11 @@ fn classify_interface(name: &str) -> NetKind {
         NetKind::Wifi
     } else if n.starts_with("eth") || n.starts_with("enp") || n.starts_with("en") {
         NetKind::Ethernet
-    } else if n.starts_with("veth") || n.starts_with("docker") || n.starts_with("br-") || n.starts_with("cali") {
+    } else if n.starts_with("veth")
+        || n.starts_with("docker")
+        || n.starts_with("br-")
+        || n.starts_with("cali")
+    {
         NetKind::Virtual
     } else {
         NetKind::Unknown
@@ -119,9 +125,20 @@ impl SysMetrics {
         // Capture initial network counters.
         let prev_net: HashMap<String, (u64, u64)> = networks
             .iter()
-            .map(|(name, data)| (name.clone(), (data.total_received(), data.total_transmitted())))
+            .map(|(name, data)| {
+                (
+                    name.clone(),
+                    (data.total_received(), data.total_transmitted()),
+                )
+            })
             .collect();
-        Self { sys, disks, networks, components, prev_net }
+        Self {
+            sys,
+            disks,
+            networks,
+            components,
+            prev_net,
+        }
     }
 
     pub fn refresh(&mut self) {
@@ -129,9 +146,15 @@ impl SysMetrics {
         self.sys.refresh_memory();
         self.disks.refresh();
         // Snapshot previous counters before refresh.
-        self.prev_net = self.networks
+        self.prev_net = self
+            .networks
             .iter()
-            .map(|(name, data)| (name.clone(), (data.total_received(), data.total_transmitted())))
+            .map(|(name, data)| {
+                (
+                    name.clone(),
+                    (data.total_received(), data.total_transmitted()),
+                )
+            })
             .collect();
         self.networks.refresh();
         self.components.refresh();
@@ -153,7 +176,9 @@ impl SysMetrics {
             .filter(|d| {
                 let mp = d.mount_point().to_string_lossy();
                 // Filter to meaningful mounts.
-                mp == "/" || mp.starts_with("/home") || mp.starts_with("/Users")
+                mp == "/"
+                    || mp.starts_with("/home")
+                    || mp.starts_with("/Users")
                     || mp == "/System/Volumes/Data"
                     || mp.starts_with("/Volumes")
             })
@@ -184,7 +209,11 @@ impl SysMetrics {
             .map(|(name, data)| {
                 let rx = data.total_received();
                 let tx = data.total_transmitted();
-                let (prev_rx, prev_tx) = self.prev_net.get(name.as_str()).copied().unwrap_or((rx, tx));
+                let (prev_rx, prev_tx) = self
+                    .prev_net
+                    .get(name.as_str())
+                    .copied()
+                    .unwrap_or((rx, tx));
                 NetInfo {
                     name: name.clone(),
                     kind: classify_interface(name),
@@ -196,7 +225,10 @@ impl SysMetrics {
             })
             .collect();
 
-        let cpu_brand = self.sys.cpus().first()
+        let cpu_brand = self
+            .sys
+            .cpus()
+            .first()
             .map(|c| c.brand().to_string())
             .unwrap_or_default();
 
@@ -213,7 +245,8 @@ impl SysMetrics {
 
         SysSnapshot {
             hostname: System::host_name().unwrap_or_else(|| "unknown".into()),
-            os_name: System::long_os_version().unwrap_or_else(|| System::name().unwrap_or_default()),
+            os_name: System::long_os_version()
+                .unwrap_or_else(|| System::name().unwrap_or_default()),
             kernel_version: System::kernel_version().unwrap_or_default(),
             cpu_brand,
             uptime_secs: System::uptime(),
@@ -267,10 +300,12 @@ fn get_battery_info() -> Option<BatteryInfo> {
                 if let Some(pct_str) = line.split('\t').nth(1) {
                     if let Some(pct) = pct_str.split('%').next() {
                         if let Ok(percent) = pct.trim().parse::<f32>() {
-                            let charging = pct_str.contains("charging") && !pct_str.contains("not charging");
+                            let charging =
+                                pct_str.contains("charging") && !pct_str.contains("not charging");
                             // Parse time remaining: "2:30 remaining" or "(no estimate)"
                             let time_remaining = if pct_str.contains("remaining") {
-                                pct_str.split(';')
+                                pct_str
+                                    .split(';')
                                     .find(|s| s.contains("remaining"))
                                     .map(|s| s.trim().replace(" remaining", ""))
                             } else if pct_str.contains("(no estimate)") {
@@ -278,7 +313,12 @@ fn get_battery_info() -> Option<BatteryInfo> {
                             } else {
                                 None
                             };
-                            return Some(BatteryInfo { percent, charging, source, time_remaining });
+                            return Some(BatteryInfo {
+                                percent,
+                                charging,
+                                source,
+                                time_remaining,
+                            });
                         }
                     }
                 }
@@ -300,13 +340,20 @@ fn get_battery_info() -> Option<BatteryInfo> {
             let power = std::fs::read_to_string("/sys/class/power_supply/BAT0/power_now").ok()?;
             let energy: f64 = energy.trim().parse().ok()?;
             let power: f64 = power.trim().parse().ok()?;
-            if power <= 0.0 { return None; }
+            if power <= 0.0 {
+                return None;
+            }
             let hours = energy / power;
             let h = hours as u64;
             let m = ((hours - h as f64) * 60.0) as u64;
             Some(format!("{h}:{m:02}"))
         })();
-        Some(BatteryInfo { percent, charging, source, time_remaining })
+        Some(BatteryInfo {
+            percent,
+            charging,
+            source,
+            time_remaining,
+        })
     }
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     {

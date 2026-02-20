@@ -15,15 +15,25 @@ pub fn draw_k8s(frame: &mut Frame, area: Rect, app: &App) {
             } else {
                 String::new()
             };
-            let title_color = if total_failed > 0 { Color::Yellow } else { Color::Blue };
+            let title_color = if total_failed > 0 {
+                Color::Yellow
+            } else {
+                Color::Blue
+            };
             let block = Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .title(format!(" Kubernetes ({} clusters, {total_nodes}n/{total_pods}p{health_tag}) ", k8s.clusters.len()))
+                .title(format!(
+                    " Kubernetes ({} clusters, {total_nodes}n/{total_pods}p{health_tag}) ",
+                    k8s.clusters.len()
+                ))
                 .border_style(Style::default().fg(title_color));
 
-            let header = Row::new(vec!["Cluster", "Nodes", "Pods", "Status"])
-                .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD));
+            let header = Row::new(vec!["Cluster", "Nodes", "Pods", "Status"]).style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            );
 
             let rows: Vec<Row> = k8s
                 .clusters
@@ -44,7 +54,11 @@ pub fn draw_k8s(frame: &mut Frame, area: Rect, app: &App) {
                     } else {
                         "healthy".to_string()
                     };
-                    let bg = if i % 2 == 1 { Color::Rgb(30, 30, 40) } else { Color::Reset };
+                    let bg = if i % 2 == 1 {
+                        Color::Rgb(30, 30, 40)
+                    } else {
+                        Color::Reset
+                    };
                     Row::new(vec![
                         c.context.clone(),
                         format!("{}", c.nodes.len()),

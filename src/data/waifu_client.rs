@@ -38,11 +38,7 @@ pub async fn fetch_random(endpoint: &str, category: &str, cache_dir: &Path) -> R
     }
 
     // Step 3: Download image bytes.
-    let data = client.get(&meta.url)
-        .send()
-        .await?
-        .bytes()
-        .await?;
+    let data = client.get(&meta.url).send().await?.bytes().await?;
 
     // Step 4: Atomic write to cache.
     std::fs::create_dir_all(cache_dir)?;

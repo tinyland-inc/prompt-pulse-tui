@@ -11,10 +11,7 @@ pub fn draw_billing(frame: &mut Frame, area: Rect, app: &App) {
 
     match &app.billing {
         Some(billing) => {
-            let title = format!(
-                " Cloud Billing (${:.2}/mo) ",
-                billing.total_monthly_usd
-            );
+            let title = format!(" Cloud Billing (${:.2}/mo) ", billing.total_monthly_usd);
 
             let inner = block.clone().title(title.clone());
 
@@ -61,11 +58,7 @@ pub fn draw_billing(frame: &mut Frame, area: Rect, app: &App) {
     }
 }
 
-fn draw_providers(
-    frame: &mut Frame,
-    area: Rect,
-    billing: &crate::data::BillingReport,
-) {
+fn draw_providers(frame: &mut Frame, area: Rect, billing: &crate::data::BillingReport) {
     let rows: Vec<Row> = billing
         .providers
         .iter()
@@ -76,7 +69,11 @@ fn draw_providers(
             } else {
                 Color::Red
             };
-            let bg = if i % 2 == 1 { Color::Rgb(30, 30, 40) } else { Color::Reset };
+            let bg = if i % 2 == 1 {
+                Color::Rgb(30, 30, 40)
+            } else {
+                Color::Reset
+            };
             Row::new(vec![
                 p.name.clone(),
                 format!("${:.2}", p.month_to_date),
