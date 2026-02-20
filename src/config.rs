@@ -90,7 +90,6 @@ impl TuiConfig {
             dirs::cache_dir()
                 .unwrap_or_else(|| PathBuf::from("/tmp"))
                 .join("prompt-pulse")
-                .join("data")
         }
     }
 }

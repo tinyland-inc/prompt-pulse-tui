@@ -86,6 +86,7 @@ pub struct App {
     pub term_width: u16,
     pub term_height: u16,
     pub show_help: bool,
+    pub help_tab: usize,  // 0=TUI, 1=Shell, 2=Lab, 3=Starship
     pub frozen: bool,
 
     // Process filter (btm-style '/' search).
@@ -177,6 +178,7 @@ impl App {
             term_width: 0,
             term_height: 0,
             show_help: false,
+            help_tab: 0,
             frozen: false,
             process_filter: String::new(),
             filter_mode: false,
@@ -240,11 +242,22 @@ impl App {
         // Toggle help overlay.
         if key.code == KeyCode::Char('?') {
             self.show_help = !self.show_help;
+            if self.show_help {
+                self.help_tab = 0;
+            }
             return;
         }
-        // Dismiss help on any key if showing.
+        // Navigate within help overlay if showing.
         if self.show_help {
-            self.show_help = false;
+            match key.code {
+                KeyCode::Right | KeyCode::Tab => self.help_tab = (self.help_tab + 1) % 4,
+                KeyCode::Left | KeyCode::BackTab => self.help_tab = (self.help_tab + 3) % 4,
+                KeyCode::Char('1') => self.help_tab = 0,
+                KeyCode::Char('2') => self.help_tab = 1,
+                KeyCode::Char('3') => self.help_tab = 2,
+                KeyCode::Char('4') => self.help_tab = 3,
+                _ => self.show_help = false,  // Any other key dismisses
+            }
             return;
         }
 

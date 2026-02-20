@@ -29,6 +29,12 @@ pub struct AccountUsage {
     pub models: Vec<ModelUsage>,
     #[serde(default)]
     pub workspaces: Vec<WorkspaceUsage>,
+    #[serde(default)]
+    pub daily_burn_rate: f64,
+    #[serde(default)]
+    pub projected_monthly: f64,
+    #[serde(default)]
+    pub days_remaining: i32,
 }
 
 #[derive(Debug, Default, Deserialize)]
