@@ -241,7 +241,7 @@ impl App {
         proc_sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
         let users = sysinfo::Users::new_with_refreshed_list();
 
-        Ok(Self {
+        let mut result = Ok(Self {
             cfg,
             active_tab: Tab::Dashboard,
             term_width: 0,
@@ -290,7 +290,20 @@ impl App {
             component_versions,
             waifu_fetch_rx,
             waifu_fetch_tx,
-        })
+        });
+
+        // Auto-fetch waifu from live service if cache is empty but endpoint is configured.
+        // This ensures hosts without a Go daemon cache still get images.
+        if let Ok(ref mut app) = result {
+            if app.waifu_images.is_empty()
+                && app.cfg.image.waifu_enabled
+                && app.cfg.waifu_endpoint().is_some()
+            {
+                app.waifu_fetch_live();
+            }
+        }
+
+        result
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) {
