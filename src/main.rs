@@ -22,7 +22,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::prelude::*;
-use ratatui_image::picker::Picker;
+use ratatui_image::picker::{Picker, ProtocolType};
 use tracing_subscriber::EnvFilter;
 
 use crate::app::App;
@@ -54,10 +54,33 @@ async fn main() -> Result<()> {
 
     // Query terminal for image protocol support and font size.
     // Must be called after EnterAlternateScreen but before event loop.
-    let picker = Picker::from_query_stdio().unwrap_or_else(|_| {
-        tracing::warn!("failed to query terminal capabilities, falling back to halfblocks");
+    let mut picker = Picker::from_query_stdio().unwrap_or_else(|e| {
+        tracing::warn!("failed to query terminal capabilities: {e}, using fontsize fallback");
         Picker::from_fontsize((8, 16))
     });
+
+    // Apply config-based protocol override, or auto-detect from TERM_PROGRAM.
+    match cfg.image.protocol.as_str() {
+        "kitty" => picker.set_protocol_type(ProtocolType::Kitty),
+        "sixel" => picker.set_protocol_type(ProtocolType::Sixel),
+        "iterm2" => picker.set_protocol_type(ProtocolType::Iterm2),
+        "halfblocks" => picker.set_protocol_type(ProtocolType::Halfblocks),
+        _ => {
+            // "auto" or empty: detect Ghostty/Kitty from env if query fell back to halfblocks.
+            if picker.protocol_type() == ProtocolType::Halfblocks {
+                if let Ok(term) = std::env::var("TERM_PROGRAM") {
+                    let t = term.to_lowercase();
+                    if t.contains("ghostty") || t.contains("kitty") {
+                        tracing::info!("detected {term}, overriding protocol to Kitty");
+                        picker.set_protocol_type(ProtocolType::Kitty);
+                    } else if t.contains("iterm") || t.contains("wezterm") {
+                        tracing::info!("detected {term}, overriding protocol to iTerm2");
+                        picker.set_protocol_type(ProtocolType::Iterm2);
+                    }
+                }
+            }
+        }
+    }
 
     let mut app = App::new(cfg, picker, expand_widget).await?;
 

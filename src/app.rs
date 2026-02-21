@@ -1,14 +1,16 @@
 use std::collections::VecDeque;
-use std::path::PathBuf;
 use std::time::Instant;
 
 use anyhow::Result;
 use crossterm::event::{KeyEvent, MouseEvent};
+use image::imageops::FilterType;
 use ratatui_image::picker::Picker;
 use ratatui_image::protocol::StatefulProtocol;
 
 use crate::config::TuiConfig;
 use crate::data::claudepersonal::ClaudePersonalReport;
+use crate::data::waifu::WaifuEntry;
+use crate::data::waifu_client::FetchResult;
 use crate::data::{
     self, BillingReport, CacheReader, ClaudeUsage, K8sStatus, SysMetrics, TailscaleStatus,
 };
@@ -148,8 +150,8 @@ pub struct App {
     // Waifu image rendering state (ratatui-image StatefulProtocol).
     pub waifu_state: Option<StatefulProtocol>,
 
-    // Waifu sequential navigation state.
-    pub waifu_images: Vec<PathBuf>,
+    // Waifu in-memory gallery (live-fetched, no disk cache).
+    pub waifu_gallery: Vec<WaifuEntry>,
     pub waifu_index: i32,
     pub waifu_show_info: bool,
     pub waifu_name: String,
@@ -175,15 +177,15 @@ pub struct App {
     // Build/component version info (read once at startup).
     pub component_versions: data::buildinfo::ComponentVersions,
 
-    // Channel for receiving live-fetched waifu image paths.
-    waifu_fetch_rx: mpsc::Receiver<PathBuf>,
-    waifu_fetch_tx: mpsc::Sender<PathBuf>,
+    // Channel for receiving live-fetched waifu results (None = fetch failed).
+    waifu_fetch_rx: mpsc::Receiver<Option<FetchResult>>,
+    waifu_fetch_tx: mpsc::Sender<Option<FetchResult>>,
 }
 
 impl App {
     pub async fn new(
         cfg: TuiConfig,
-        mut picker: Picker,
+        picker: Picker,
         expand_widget: Option<String>,
     ) -> Result<Self> {
         let cache_reader = CacheReader::new(cfg.cache_dir());
@@ -196,36 +198,11 @@ impl App {
         let k8s = cache_reader.read_k8s();
         let claude_personal = cache_reader.read_claude_personal();
 
-        // Load waifu image list and initial image.
-        let waifu_images = if cfg.image.waifu_enabled {
-            data::waifu::list_images(&cfg)
-        } else {
-            Vec::new()
-        };
-
-        let waifu_state = if cfg.image.waifu_enabled {
-            data::waifu::load_cached_waifu(&cfg)
-                .ok()
-                .flatten()
-                .map(|img| picker.new_resize_protocol(img))
-        } else {
-            None
-        };
-
-        // Find the index of the initially loaded image (newest by mtime).
-        let waifu_index: i32 = if !waifu_images.is_empty() {
-            // The newest image is what load_cached_waifu picked; find it in the sorted list.
-            // Since we don't know the exact path, default to last index.
-            (waifu_images.len() as i32) - 1
-        } else {
-            -1
-        };
-
-        let waifu_name = if waifu_index >= 0 {
-            data::waifu::format_image_name(&waifu_images[waifu_index as usize])
-        } else {
-            String::new()
-        };
+        // Waifu gallery starts empty — images are fetched live from the web service.
+        let waifu_gallery: Vec<WaifuEntry> = Vec::new();
+        let waifu_state: Option<StatefulProtocol> = None;
+        let waifu_index: i32 = -1;
+        let waifu_name = String::new();
 
         // Expand mode from CLI flag.
         let expanded = expand_widget.as_deref() == Some("waifu");
@@ -274,7 +251,7 @@ impl App {
             billing,
             k8s,
             waifu_state,
-            waifu_images,
+            waifu_gallery,
             waifu_index,
             waifu_show_info: false,
             waifu_name,
@@ -292,13 +269,9 @@ impl App {
             waifu_fetch_tx,
         });
 
-        // Auto-fetch waifu from live service if cache is empty but endpoint is configured.
-        // This ensures hosts without a Go daemon cache still get images.
+        // Auto-fetch waifu from live service on launch.
         if let Ok(ref mut app) = result {
-            if app.waifu_images.is_empty()
-                && app.cfg.image.waifu_enabled
-                && app.cfg.waifu_endpoint().is_some()
-            {
+            if app.cfg.image.waifu_enabled && app.cfg.waifu_endpoint().is_some() {
                 app.waifu_fetch_live();
             }
         }
@@ -506,8 +479,16 @@ impl App {
     }
 
     pub fn on_resize(&mut self, w: u16, h: u16) {
+        let old_w = self.term_width;
+        let old_h = self.term_height;
         self.term_width = w;
         self.term_height = h;
+
+        // Re-create waifu protocol when terminal size changes substantially,
+        // so the image is pre-scaled to fill the new widget area.
+        if self.waifu_index >= 0 && (old_w != w || old_h != h) {
+            self.waifu_load_at(self.waifu_index as usize);
+        }
     }
 
     /// Called every tick (~250ms). Refresh real-time system data and
@@ -707,18 +688,15 @@ impl App {
     }
 
     /// Whether the waifu widget area should be shown in the layout.
-    /// True when waifu is enabled AND either an image is loaded, a live
-    /// endpoint is configured, or cached images exist on disk.
+    /// True when waifu is enabled AND a live endpoint is configured.
     pub fn wants_waifu(&self) -> bool {
-        self.cfg.image.waifu_enabled
-            && (self.waifu_state.is_some()
-                || self.cfg.waifu_endpoint().is_some()
-                || !self.waifu_images.is_empty())
+        self.cfg.image.waifu_enabled && self.cfg.waifu_endpoint().is_some()
     }
 
     /// Navigate to a waifu image by relative offset (1 = next, -1 = prev).
+    /// Also triggers a background fetch to grow the gallery on demand.
     pub fn waifu_navigate(&mut self, delta: i32) {
-        let n = self.waifu_images.len() as i32;
+        let n = self.waifu_gallery.len() as i32;
         if n == 0 {
             return;
         }
@@ -729,11 +707,15 @@ impl App {
         };
         let new_idx = ((base + delta) % n + n) % n;
         self.waifu_load_at(new_idx as usize);
+
+        // Auto-fetch more images as the user navigates.
+        self.waifu_fetch_live();
     }
 
     /// Navigate to a random waifu image.
+    /// Also triggers a background fetch to grow the gallery.
     pub fn waifu_random(&mut self) {
-        let n = self.waifu_images.len();
+        let n = self.waifu_gallery.len();
         if n == 0 {
             return;
         }
@@ -744,6 +726,9 @@ impl App {
             .unwrap_or(0) as usize;
         let idx = nanos % n;
         self.waifu_load_at(idx);
+
+        // Auto-fetch more images as the user navigates.
+        self.waifu_fetch_live();
     }
 
     /// Fetch a new random image from the live waifu mirror service.
@@ -757,48 +742,139 @@ impl App {
             None => return, // No endpoint configured.
         };
         let category = self.cfg.waifu_category().to_string();
-        let cache_dir = self.cfg.cache_dir().join("waifu");
         let tx = self.waifu_fetch_tx.clone();
         self.waifu_fetching = true;
 
         tokio::spawn(async move {
-            match data::waifu_client::fetch_random(&endpoint, &category, &cache_dir).await {
-                Ok(path) => {
-                    let _ = tx.send(path).await;
+            match data::waifu_client::fetch_random(&endpoint, &category).await {
+                Ok(result) => {
+                    let _ = tx.send(Some(result)).await;
                 }
                 Err(e) => {
                     tracing::warn!("waifu fetch failed: {}", e);
+                    let _ = tx.send(None).await;
                 }
             }
         });
     }
 
+    /// Minimum gallery size for auto-fetch on launch.
+    const GALLERY_PREFETCH: usize = 3;
+
     /// Poll for completed live fetch results (called from tick).
     fn poll_waifu_fetch(&mut self) {
-        while let Ok(path) = self.waifu_fetch_rx.try_recv() {
+        while let Ok(msg) = self.waifu_fetch_rx.try_recv() {
             self.waifu_fetching = false;
-            // Reload the image list and navigate to the new image.
-            self.waifu_images = data::waifu::list_images(&self.cfg);
-            if let Some(idx) = self.waifu_images.iter().position(|p| *p == path) {
-                self.waifu_load_at(idx);
-            } else if !self.waifu_images.is_empty() {
-                // Image might have a different path; load the newest.
-                self.waifu_load_at(self.waifu_images.len() - 1);
+
+            let result = match msg {
+                Some(r) => r,
+                None => {
+                    // Fetch failed; chain next if gallery still small.
+                    if self.waifu_gallery.len() < Self::GALLERY_PREFETCH {
+                        self.waifu_fetch_live();
+                    }
+                    continue;
+                }
+            };
+
+            // Decode image from raw bytes.
+            let image = match data::waifu::decode_image_bytes(&result.data) {
+                Ok(img) => img,
+                Err(e) => {
+                    tracing::warn!("waifu decode failed: {}", e);
+                    continue;
+                }
+            };
+
+            // Dedup by hash: skip if already in gallery.
+            if self.waifu_gallery.iter().any(|e| e.hash == result.hash) {
+                // Already have this image; just navigate to it.
+                if let Some(idx) = self
+                    .waifu_gallery
+                    .iter()
+                    .position(|e| e.hash == result.hash)
+                {
+                    self.waifu_load_at(idx);
+                }
+                // Still chain prefetch — the dupe doesn't count toward our target.
+                if self.waifu_gallery.len() < Self::GALLERY_PREFETCH {
+                    self.waifu_fetch_live();
+                }
+                continue;
+            }
+
+            // Add to gallery.
+            let name = data::waifu::format_image_name(&result.name);
+            let gallery_was_small = self.waifu_gallery.len() < Self::GALLERY_PREFETCH;
+            let entry = WaifuEntry {
+                image: image.clone(),
+                name: name.clone(),
+                hash: result.hash,
+            };
+            self.waifu_gallery.push(entry);
+
+            // Auto-display during initial prefetch (gallery building up).
+            // After prefetch, silently add to gallery — don't stomp user's navigation.
+            if gallery_was_small || self.waifu_index < 0 {
+                let idx = self.waifu_gallery.len() - 1;
+                let scaled = self.prepare_waifu_image(&image);
+                self.waifu_state = Some(self.picker.new_resize_protocol(scaled));
+                self.waifu_index = idx as i32;
+                self.waifu_name = name;
+            }
+
+            // Auto-fetch more until gallery reaches prefetch target.
+            if self.waifu_gallery.len() < Self::GALLERY_PREFETCH {
+                self.waifu_fetch_live();
             }
         }
     }
 
-    /// Load the waifu image at the given index.
-    fn waifu_load_at(&mut self, idx: usize) {
-        if idx >= self.waifu_images.len() {
+    /// Load the waifu image at the given gallery index.
+    /// Pre-scales the image to fill the widget area (cover mode).
+    pub(crate) fn waifu_load_at(&mut self, idx: usize) {
+        if idx >= self.waifu_gallery.len() {
             return;
         }
-        let path = &self.waifu_images[idx];
-        if let Ok(img) = data::waifu::load_image(path) {
-            self.waifu_state = Some(self.picker.new_resize_protocol(img));
-            self.waifu_index = idx as i32;
-            self.waifu_name = data::waifu::format_image_name(path);
+        let entry = &self.waifu_gallery[idx];
+        let scaled = self.prepare_waifu_image(&entry.image);
+        self.waifu_state = Some(self.picker.new_resize_protocol(scaled));
+        self.waifu_index = idx as i32;
+        self.waifu_name = entry.name.clone();
+    }
+
+    /// Pre-scale image to fill the widget area (CSS object-fit: cover).
+    /// Scales the image so its cell dimensions >= the widget area,
+    /// ensuring Resize::Crop fills the widget with no empty space.
+    fn prepare_waifu_image(&self, image: &image::DynamicImage) -> image::DynamicImage {
+        let (fw, fh) = self.picker.font_size();
+        if fw == 0 || fh == 0 {
+            return image.clone();
         }
+
+        // Estimate widget area in cells. Waifu gets ~40% width, full height minus chrome.
+        let cols = if self.term_width > 0 {
+            (self.term_width * 40 / 100).max(20) as u32
+        } else {
+            80
+        };
+        let rows = if self.term_height > 0 {
+            self.term_height.saturating_sub(4).max(10) as u32
+        } else {
+            40
+        };
+
+        // Target pixel dimensions.
+        let target_w = cols * fw as u32;
+        let target_h = rows * fh as u32;
+
+        if target_w == 0 || target_h == 0 {
+            return image.clone();
+        }
+
+        // resize_to_fill: scales uniformly to cover the target, then center-crops to exact size.
+        // CatmullRom is a good speed/quality balance (Lanczos3 is ~3x slower).
+        image.resize_to_fill(target_w, target_h, FilterType::CatmullRom)
     }
 
     /// Kill the currently selected process.
@@ -943,7 +1019,7 @@ impl App {
             billing: None,
             k8s: None,
             waifu_state: None,
-            waifu_images: Vec::new(),
+            waifu_gallery: Vec::new(),
             waifu_index: -1,
             waifu_show_info: false,
             waifu_name: String::new(),
@@ -962,18 +1038,19 @@ impl App {
         }
     }
 
-    /// Builder: set waifu image list for testing navigation.
-    pub fn with_waifu_images(mut self, images: Vec<PathBuf>) -> Self {
-        self.waifu_images = images;
-        if !self.waifu_images.is_empty() {
+    /// Builder: set waifu gallery for testing navigation.
+    pub fn with_waifu_gallery(mut self, gallery: Vec<WaifuEntry>) -> Self {
+        if !gallery.is_empty() {
             self.waifu_index = 0;
         }
+        self.waifu_gallery = gallery;
         self
     }
 
-    /// Builder: enable waifu in config.
+    /// Builder: enable waifu in config with an endpoint.
     pub fn with_waifu_enabled(mut self) -> Self {
         self.cfg.image.waifu_enabled = true;
+        self.cfg.collectors.waifu.endpoint = "https://waifu.example.com".into();
         self
     }
 
@@ -1184,11 +1261,12 @@ mod tests {
     }
 
     #[test]
-    fn test_wants_waifu_enabled_with_images() {
+    fn test_wants_waifu_enabled_no_endpoint() {
         let mut cfg = TuiConfig::default();
         cfg.image.waifu_enabled = true;
-        let app = App::test_new(cfg).with_waifu_images(vec![PathBuf::from("/fake/image.png")]);
-        assert!(app.wants_waifu());
+        // No endpoint configured — wants_waifu should be false.
+        let app = App::test_new(cfg);
+        assert!(!app.wants_waifu());
     }
 
     #[test]
@@ -1294,30 +1372,97 @@ mod tests {
         assert_eq!(tree[1].tree_depth, 1);
     }
 
-    // --- Waifu Navigation Arithmetic ---
+    // --- Waifu Navigation ---
 
-    #[test]
-    fn test_navigate_empty_noop() {
+    fn make_gallery(n: usize) -> Vec<WaifuEntry> {
+        (0..n)
+            .map(|i| WaifuEntry {
+                image: image::DynamicImage::new_rgb8(1, 1),
+                name: format!("waifu_{i}"),
+                hash: format!("hash_{i}"),
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_navigate_empty_noop() {
         let mut app = App::test_new(TuiConfig::default());
         app.waifu_navigate(1);
         assert_eq!(app.waifu_index, -1);
     }
 
-    #[test]
-    fn test_navigate_wraps_forward() {
-        // Test the wrap-around arithmetic directly
-        let n: i32 = 3;
-        let idx = 2;
-        let new = ((idx + 1) % n + n) % n;
-        assert_eq!(new, 0);
+    #[tokio::test]
+    async fn test_navigate_forward_through_gallery() {
+        let mut app = App::test_new(TuiConfig::default())
+            .with_waifu_enabled()
+            .with_waifu_gallery(make_gallery(3));
+        assert_eq!(app.waifu_index, 0);
+        app.waifu_navigate(1);
+        assert_eq!(app.waifu_index, 1);
+        assert_eq!(app.waifu_name, "waifu_1");
+        app.waifu_navigate(1);
+        assert_eq!(app.waifu_index, 2);
+        assert_eq!(app.waifu_name, "waifu_2");
     }
 
-    #[test]
-    fn test_navigate_wraps_backward() {
-        let n: i32 = 3;
-        let idx = 0;
-        let new = ((idx + (-1)) % n + n) % n;
-        assert_eq!(new, 2);
+    #[tokio::test]
+    async fn test_navigate_wraps_forward() {
+        let mut app = App::test_new(TuiConfig::default())
+            .with_waifu_enabled()
+            .with_waifu_gallery(make_gallery(3));
+        app.waifu_index = 2;
+        app.waifu_navigate(1);
+        assert_eq!(app.waifu_index, 0);
+        assert_eq!(app.waifu_name, "waifu_0");
+    }
+
+    #[tokio::test]
+    async fn test_navigate_wraps_backward() {
+        let mut app = App::test_new(TuiConfig::default())
+            .with_waifu_enabled()
+            .with_waifu_gallery(make_gallery(3));
+        assert_eq!(app.waifu_index, 0);
+        app.waifu_navigate(-1);
+        assert_eq!(app.waifu_index, 2);
+        assert_eq!(app.waifu_name, "waifu_2");
+    }
+
+    #[tokio::test]
+    async fn test_navigate_single_item_stays() {
+        let mut app = App::test_new(TuiConfig::default())
+            .with_waifu_enabled()
+            .with_waifu_gallery(make_gallery(1));
+        assert_eq!(app.waifu_index, 0);
+        app.waifu_navigate(1);
+        assert_eq!(app.waifu_index, 0);
+        app.waifu_navigate(-1);
+        assert_eq!(app.waifu_index, 0);
+    }
+
+    #[tokio::test]
+    async fn test_waifu_key_n_navigates_on_dashboard() {
+        let mut app = App::test_new(TuiConfig::default())
+            .with_waifu_enabled()
+            .with_waifu_gallery(make_gallery(3));
+        // Load initial image so has_waifu() is true.
+        app.waifu_load_at(0);
+        app.active_tab = Tab::Dashboard;
+        assert!(app.has_waifu());
+        app.handle_key(char_key('n'));
+        assert_eq!(app.waifu_index, 1);
+        app.handle_key(char_key('p'));
+        assert_eq!(app.waifu_index, 0);
+    }
+
+    #[tokio::test]
+    async fn test_waifu_random_selects_from_gallery() {
+        let mut app = App::test_new(TuiConfig::default())
+            .with_waifu_enabled()
+            .with_waifu_gallery(make_gallery(5));
+        app.waifu_load_at(0);
+        app.waifu_random();
+        // Random should select a valid index.
+        assert!(app.waifu_index >= 0 && (app.waifu_index as usize) < 5);
     }
 
     // --- Freeze Toggle ---
@@ -1403,20 +1548,16 @@ mod tests {
         fn wants_waifu_logic(
             enabled in proptest::bool::ANY,
             has_endpoint in proptest::bool::ANY,
-            has_images in proptest::bool::ANY,
         ) {
             let mut cfg = TuiConfig::default();
             cfg.image.waifu_enabled = enabled;
             if has_endpoint {
                 cfg.collectors.waifu.endpoint = "https://waifu.example.com".into();
             }
-            let mut app = App::test_new(cfg);
-            if has_images {
-                app = app.with_waifu_images(vec![std::path::PathBuf::from("/fake/a.png")]);
-            }
+            let app = App::test_new(cfg);
             let wants = app.wants_waifu();
-            // Must be enabled AND (have endpoint OR have images)
-            let expected = enabled && (has_endpoint || has_images);
+            // Must be enabled AND have endpoint
+            let expected = enabled && has_endpoint;
             prop_assert_eq!(wants, expected);
         }
     }

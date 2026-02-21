@@ -303,23 +303,11 @@ instant_banner = true
         eprintln!("  waifu_endpoint(): {:?}", cfg.waifu_endpoint());
         eprintln!("  waifu_category(): {:?}", cfg.waifu_category());
 
-        let waifu_dir = cfg.cache_dir().join("waifu");
-        eprintln!("  waifu_dir exists: {}", waifu_dir.exists());
-        if waifu_dir.exists() {
-            let images = crate::data::waifu::list_images(&cfg);
-            eprintln!("  waifu images: {}", images.len());
-            for img in &images {
-                eprintln!("    {}", img.display());
-            }
-        }
-
-        // If waifu is enabled, we must see the endpoint or images.
+        // In live-only mode, waifu requires an endpoint (no disk cache).
         if cfg.image.waifu_enabled {
-            let wants =
-                cfg.waifu_endpoint().is_some() || !crate::data::waifu::list_images(&cfg).is_empty();
             assert!(
-                wants,
-                "waifu is enabled but no endpoint and no cached images"
+                cfg.waifu_endpoint().is_some(),
+                "waifu is enabled but no endpoint configured"
             );
         }
     }

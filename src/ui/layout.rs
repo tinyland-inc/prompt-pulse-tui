@@ -8,67 +8,97 @@ use crate::app::App;
 pub fn dashboard(frame: &mut Frame, area: Rect, app: &mut App) {
     let wide = area.width >= 120;
 
+    let has_waifu = app.wants_waifu();
+
     if wide {
-        // Wide: [left column: sys+host] [right column: tailscale+billing+claude]
-        let cols = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
-            .split(area);
+        if has_waifu {
+            // Wide with waifu: [left 40%: waifu full height] [right 60%: sys data]
+            let cols = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+                .split(area);
 
-        // Left column: host info + sparklines + CPU/RAM gauges + disks.
-        let left = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(9), // host info (hostname, kernel, cpu, uptime, IP/procs, shell, battery)
-                Constraint::Length(5), // sparklines (CPU + MEM side by side)
-                Constraint::Length(8), // CPU bars
-                Constraint::Length(6), // memory
-                Constraint::Min(4),    // disks
-            ])
-            .split(cols[0]);
+            widgets::waifu::draw_waifu(frame, cols[0], app);
 
-        widgets::host::draw_host_info(frame, left[0], app);
-
-        // Sparklines row: CPU, MEM, Swap.
-        let spark_cols = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Percentage(35),
-                Constraint::Percentage(35),
-                Constraint::Percentage(30),
-            ])
-            .split(left[1]);
-        widgets::sparkline::draw_cpu_sparkline(frame, spark_cols[0], app);
-        widgets::sparkline::draw_mem_sparkline(frame, spark_cols[1], app);
-        widgets::sparkline::draw_swap_sparkline(frame, spark_cols[2], app);
-
-        widgets::cpu::draw_cpu_bars(frame, left[2], app);
-        widgets::memory::draw_memory(frame, left[3], app);
-        widgets::disk::draw_disks(frame, left[4], app);
-
-        // Right column.
-        let right_has_waifu = app.wants_waifu();
-        if right_has_waifu {
+            // Right column: host + sparklines + CPU + memory + tailscale/disks + claude/billing.
             let right = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    Constraint::Percentage(50), // waifu
-                    Constraint::Length(8),      // tailscale
-                    Constraint::Min(5),         // billing/claude
+                    Constraint::Length(9), // host info
+                    Constraint::Length(5), // sparklines
+                    Constraint::Length(8), // CPU bars
+                    Constraint::Length(6), // memory
+                    Constraint::Length(8), // tailscale + disks side by side
+                    Constraint::Min(5),    // claude + billing
                 ])
                 .split(cols[1]);
 
-            widgets::waifu::draw_waifu(frame, right[0], app);
-            widgets::tailscale::draw_tailscale(frame, right[1], app);
+            widgets::host::draw_host_info(frame, right[0], app);
+
+            let spark_cols = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(35),
+                    Constraint::Percentage(35),
+                    Constraint::Percentage(30),
+                ])
+                .split(right[1]);
+            widgets::sparkline::draw_cpu_sparkline(frame, spark_cols[0], app);
+            widgets::sparkline::draw_mem_sparkline(frame, spark_cols[1], app);
+            widgets::sparkline::draw_swap_sparkline(frame, spark_cols[2], app);
+
+            widgets::cpu::draw_cpu_bars(frame, right[2], app);
+            widgets::memory::draw_memory(frame, right[3], app);
+
+            let mid_row = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+                .split(right[4]);
+            widgets::tailscale::draw_tailscale(frame, mid_row[0], app);
+            widgets::disk::draw_disks(frame, mid_row[1], app);
 
             let bottom = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-                .split(right[2]);
-
+                .split(right[5]);
             widgets::claude::draw_claude(frame, bottom[0], app);
             widgets::billing_widget::draw_billing(frame, bottom[1], app);
         } else {
+            // Wide without waifu: [left 55%: sys] [right 45%: network/billing]
+            let cols = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+                .split(area);
+
+            let left = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Length(9), // host info
+                    Constraint::Length(5), // sparklines
+                    Constraint::Length(8), // CPU bars
+                    Constraint::Length(6), // memory
+                    Constraint::Min(4),    // disks
+                ])
+                .split(cols[0]);
+
+            widgets::host::draw_host_info(frame, left[0], app);
+
+            let spark_cols = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([
+                    Constraint::Percentage(35),
+                    Constraint::Percentage(35),
+                    Constraint::Percentage(30),
+                ])
+                .split(left[1]);
+            widgets::sparkline::draw_cpu_sparkline(frame, spark_cols[0], app);
+            widgets::sparkline::draw_mem_sparkline(frame, spark_cols[1], app);
+            widgets::sparkline::draw_swap_sparkline(frame, spark_cols[2], app);
+
+            widgets::cpu::draw_cpu_bars(frame, left[2], app);
+            widgets::memory::draw_memory(frame, left[3], app);
+            widgets::disk::draw_disks(frame, left[4], app);
+
             let right = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
@@ -91,15 +121,14 @@ pub fn dashboard(frame: &mut Frame, area: Rect, app: &mut App) {
         }
     } else {
         // Narrow: single-column stack.
-        let narrow_waifu = app.wants_waifu();
         let mut constraints = vec![
             Constraint::Length(8), // host
             Constraint::Length(4), // sparklines
             Constraint::Length(4), // memory
             Constraint::Length(4), // disks
         ];
-        if narrow_waifu {
-            constraints.push(Constraint::Length(10)); // waifu
+        if has_waifu {
+            constraints.push(Constraint::Percentage(40)); // waifu
         }
         constraints.push(Constraint::Length(6)); // tailscale
         constraints.push(Constraint::Min(3)); // billing
@@ -113,7 +142,6 @@ pub fn dashboard(frame: &mut Frame, area: Rect, app: &mut App) {
         widgets::host::draw_host_info(frame, rows[idx], app);
         idx += 1;
 
-        // Sparklines in narrow mode too.
         let spark_cols = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
@@ -127,7 +155,7 @@ pub fn dashboard(frame: &mut Frame, area: Rect, app: &mut App) {
         widgets::disk::draw_disks(frame, rows[idx], app);
         idx += 1;
 
-        if narrow_waifu {
+        if has_waifu {
             widgets::waifu::draw_waifu(frame, rows[idx], app);
             idx += 1;
         }
@@ -300,7 +328,6 @@ mod tests {
     use crate::app::{App, Tab};
     use crate::config::TuiConfig;
     use ratatui::{backend::TestBackend, buffer::Buffer, Terminal};
-    use std::path::PathBuf;
 
     /// Check if a rendered Buffer contains a substring.
     fn buffer_contains(buf: &Buffer, needle: &str) -> bool {
@@ -335,27 +362,23 @@ mod tests {
 
     #[test]
     fn wide_with_waifu_shows_waifu() {
-        let mut app = App::test_new(TuiConfig::default())
-            .with_waifu_enabled()
-            .with_waifu_images(vec![PathBuf::from("/fake/a.png")]);
+        let mut app = App::test_new(TuiConfig::default()).with_waifu_enabled();
         app.active_tab = Tab::Dashboard;
         let buf = render_app(160, 50, &mut app);
         assert!(
             buffer_contains(&buf, "Waifu"),
-            "Waifu widget should appear when enabled with images"
+            "Waifu widget should appear when enabled with endpoint"
         );
     }
 
     #[test]
-    fn wide_with_waifu_hides_kubernetes() {
-        let mut app = App::test_new(TuiConfig::default())
-            .with_waifu_enabled()
-            .with_waifu_images(vec![PathBuf::from("/fake/a.png")]);
+    fn wide_with_waifu_shows_tailscale() {
+        let mut app = App::test_new(TuiConfig::default()).with_waifu_enabled();
         app.active_tab = Tab::Dashboard;
         let buf = render_app(160, 50, &mut app);
         assert!(
-            !buffer_contains(&buf, "Kubernetes"),
-            "Kubernetes should be hidden when waifu is shown"
+            buffer_contains(&buf, "Tailscale"),
+            "Tailscale should still appear when waifu is shown"
         );
     }
 
@@ -413,9 +436,7 @@ mod tests {
 
     #[test]
     fn expanded_mode_no_tab_bar() {
-        let mut app = App::test_new(TuiConfig::default())
-            .with_waifu_enabled()
-            .with_waifu_images(vec![PathBuf::from("/fake/a.png")]);
+        let mut app = App::test_new(TuiConfig::default()).with_waifu_enabled();
         app.expanded = true;
         let buf = render_app(160, 50, &mut app);
         // In expanded mode, only waifu renders -- no tab bar with Dashboard/System/etc.
