@@ -88,10 +88,20 @@ impl TuiConfig {
     }
 
     pub fn config_path() -> PathBuf {
-        dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("prompt-pulse")
-            .join("config.toml")
+        // Respect XDG_CONFIG_HOME (used by Go daemon and home-manager).
+        // On macOS, dirs::config_dir() returns ~/Library/Application Support/
+        // but the Go daemon writes to ~/.config/ (XDG convention).
+        let base = std::env::var("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .ok()
+            .or_else(|| {
+                std::env::var("HOME")
+                    .ok()
+                    .map(|h| PathBuf::from(h).join(".config"))
+            })
+            .or_else(|| dirs::config_dir())
+            .unwrap_or_else(|| PathBuf::from("."));
+        base.join("prompt-pulse").join("config.toml")
     }
 
     /// Resolve the cache directory (daemon writes JSON here).
@@ -99,9 +109,18 @@ impl TuiConfig {
         if !self.general.cache_dir.is_empty() {
             PathBuf::from(&self.general.cache_dir)
         } else {
-            dirs::cache_dir()
-                .unwrap_or_else(|| PathBuf::from("/tmp"))
-                .join("prompt-pulse")
+            // Respect XDG_CACHE_HOME (used by Go daemon and home-manager).
+            let base = std::env::var("XDG_CACHE_HOME")
+                .map(PathBuf::from)
+                .ok()
+                .or_else(|| {
+                    std::env::var("HOME")
+                        .ok()
+                        .map(|h| PathBuf::from(h).join(".cache"))
+                })
+                .or_else(|| dirs::cache_dir())
+                .unwrap_or_else(|| PathBuf::from("/tmp"));
+            base.join("prompt-pulse")
         }
     }
 
@@ -206,5 +225,102 @@ waifu_enabled = true
         assert_eq!(cfg.cache_dir(), std::path::PathBuf::from("/tmp/test"));
         assert_eq!(cfg.waifu_endpoint(), Some("https://waifu.example.com"));
         assert!(cfg.image.waifu_enabled);
+    }
+
+    #[test]
+    fn test_toml_parse_real_daemon_config() {
+        let toml_str = r#"
+[general]
+daemon_poll_interval = "30s"
+cache_dir = "/Users/jsullivan2/.cache/prompt-pulse"
+
+[collectors.sysmetrics]
+enabled = true
+
+[collectors.tailscale]
+enabled = true
+
+[collectors.kubernetes]
+enabled = true
+
+[collectors.claude]
+enabled = true
+
+[collectors.billing]
+enabled = true
+interval = "15m"
+
+[collectors.billing.civo]
+enabled = true
+region = "nyc1"
+
+[collectors.billing.digitalocean]
+enabled = true
+
+[collectors.waifu]
+enabled = true
+endpoint = "https://waifu.ephemera.tinyland.dev"
+category = "nsfw"
+interval = "30m"
+max_images = 20
+
+[image]
+waifu_enabled = true
+protocol = "auto"
+
+[theme]
+name = "default"
+
+[shell]
+tui_keybinding = "ctrl-p"
+show_banner_on_startup = true
+instant_banner = true
+"#;
+        let cfg: TuiConfig = toml::from_str(toml_str).unwrap();
+        assert!(cfg.image.waifu_enabled);
+        assert_eq!(
+            cfg.waifu_endpoint(),
+            Some("https://waifu.ephemera.tinyland.dev")
+        );
+        assert_eq!(cfg.waifu_category(), "nsfw");
+    }
+
+    /// Diagnostic test: load the REAL config from disk and verify waifu init path.
+    /// This catches config parsing issues that unit tests with hardcoded TOML miss.
+    #[test]
+    fn test_real_config_waifu_diagnostic() {
+        let cfg = TuiConfig::load().unwrap();
+        eprintln!("  image.waifu_enabled: {}", cfg.image.waifu_enabled);
+        eprintln!(
+            "  collectors.waifu.enabled: {}",
+            cfg.collectors.waifu.enabled
+        );
+        eprintln!(
+            "  collectors.waifu.endpoint: {:?}",
+            cfg.collectors.waifu.endpoint
+        );
+        eprintln!("  cache_dir: {:?}", cfg.cache_dir());
+        eprintln!("  waifu_endpoint(): {:?}", cfg.waifu_endpoint());
+        eprintln!("  waifu_category(): {:?}", cfg.waifu_category());
+
+        let waifu_dir = cfg.cache_dir().join("waifu");
+        eprintln!("  waifu_dir exists: {}", waifu_dir.exists());
+        if waifu_dir.exists() {
+            let images = crate::data::waifu::list_images(&cfg);
+            eprintln!("  waifu images: {}", images.len());
+            for img in &images {
+                eprintln!("    {}", img.display());
+            }
+        }
+
+        // If waifu is enabled, we must see the endpoint or images.
+        if cfg.image.waifu_enabled {
+            let wants =
+                cfg.waifu_endpoint().is_some() || !crate::data::waifu::list_images(&cfg).is_empty();
+            assert!(
+                wants,
+                "waifu is enabled but no endpoint and no cached images"
+            );
+        }
     }
 }
