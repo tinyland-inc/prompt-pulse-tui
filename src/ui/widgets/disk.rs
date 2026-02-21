@@ -125,3 +125,17 @@ fn format_bytes(bytes: u64) -> String {
         format!("{:.1}G", bytes as f64 / GIB as f64)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pct_gradient_disk_thresholds() {
+        // Low usage should be Green, high usage Red
+        let low = pct_gradient(20.0);
+        let high = pct_gradient(95.0);
+        assert_eq!(low, Color::Green);
+        assert_eq!(high, Color::Red);
+    }
+}

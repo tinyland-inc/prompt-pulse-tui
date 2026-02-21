@@ -228,3 +228,22 @@ fn format_uptime(secs: u64) -> String {
         format!("{mins}m")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_uptime() {
+        assert!(format_uptime(90).contains("1m"));
+        assert!(format_uptime(3700).contains("1h"));
+        assert!(format_uptime(90000).contains("1d"));
+    }
+
+    #[test]
+    fn test_format_bytes_gib() {
+        let result = format_bytes_gib(1024 * 1024 * 1024);
+        assert!(result.contains("1"), "got: {result}");
+        assert!(result.contains("GiB"), "got: {result}");
+    }
+}

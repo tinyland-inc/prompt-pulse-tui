@@ -90,3 +90,99 @@ fn is_image_file(path: &Path) -> bool {
 fn waifu_cache_dir(cfg: &TuiConfig) -> PathBuf {
     cfg.cache_dir().join("waifu")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_format_image_name_with_ext() {
+        assert_eq!(
+            format_image_name(Path::new("banner-cool_cat.img")),
+            "banner cool cat"
+        );
+    }
+
+    #[test]
+    fn test_format_image_name_path() {
+        assert_eq!(
+            format_image_name(Path::new("/path/to/my_image.png")),
+            "my image"
+        );
+    }
+
+    #[test]
+    fn test_format_image_name_no_ext() {
+        assert_eq!(format_image_name(Path::new("no-ext")), "no ext");
+    }
+
+    #[test]
+    fn test_format_image_name_empty() {
+        assert_eq!(format_image_name(Path::new("")), "");
+    }
+
+    #[test]
+    fn test_is_image_file_extensions() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        for ext in &["png", "jpg", "jpeg", "webp", "gif", "img"] {
+            let path = tmp.path().join(format!("test.{ext}"));
+            std::fs::write(&path, b"fake").unwrap();
+            assert!(is_image_file(&path), "should accept .{ext}");
+        }
+    }
+
+    #[test]
+    fn test_is_image_file_rejects_non_images() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        for ext in &["txt", "json", "toml", "rs"] {
+            let path = tmp.path().join(format!("test.{ext}"));
+            std::fs::write(&path, b"fake").unwrap();
+            assert!(!is_image_file(&path), "should reject .{ext}");
+        }
+    }
+
+    #[test]
+    fn test_list_images_sorted() {
+        let cache_dir = tempfile::TempDir::new().unwrap();
+        let waifu_dir = cache_dir.path().join("waifu");
+        std::fs::create_dir(&waifu_dir).unwrap();
+        for name in &["c.png", "a.png", "b.png", "readme.txt"] {
+            std::fs::write(waifu_dir.join(name), b"fake").unwrap();
+        }
+        let mut cfg = crate::config::TuiConfig::default();
+        cfg.general.cache_dir = cache_dir.path().to_string_lossy().into_owned();
+        let images = list_images(&cfg);
+        let names: Vec<&str> = images
+            .iter()
+            .filter_map(|p| p.file_name().and_then(|f| f.to_str()))
+            .collect();
+        assert_eq!(names, vec!["a.png", "b.png", "c.png"]);
+    }
+
+    #[test]
+    fn test_list_images_empty_dir() {
+        let cache_dir = tempfile::TempDir::new().unwrap();
+        let waifu_dir = cache_dir.path().join("waifu");
+        std::fs::create_dir(&waifu_dir).unwrap();
+        let mut cfg = crate::config::TuiConfig::default();
+        cfg.general.cache_dir = cache_dir.path().to_string_lossy().into_owned();
+        let images = list_images(&cfg);
+        assert!(images.is_empty());
+    }
+
+    #[test]
+    fn test_load_image_magic_bytes() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        // Create a real 1x1 PNG with .img extension
+        let img = image::RgbImage::new(1, 1);
+        let path = tmp.path().join("test.img");
+        img.save_with_format(&path, image::ImageFormat::Png)
+            .unwrap();
+        let loaded = load_image(&path);
+        assert!(
+            loaded.is_ok(),
+            "should detect PNG magic bytes despite .img extension"
+        );
+    }
+}

@@ -59,3 +59,42 @@ impl CacheReader {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cache_reader_valid_json() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let json = r#"{"providers":[],"total_monthly_usd":0,"budget_usd":0,"budget_percent":0}"#;
+        std::fs::write(tmp.path().join("billing.json"), json).unwrap();
+        let reader = CacheReader::new(tmp.path().to_path_buf());
+        assert!(reader.read_billing().is_some());
+    }
+
+    #[test]
+    fn test_cache_reader_missing_file() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let reader = CacheReader::new(tmp.path().to_path_buf());
+        assert!(reader.read_billing().is_none());
+    }
+
+    #[test]
+    fn test_cache_reader_corrupt_json() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::write(tmp.path().join("billing.json"), "not json at all").unwrap();
+        let reader = CacheReader::new(tmp.path().to_path_buf());
+        assert!(reader.read_billing().is_none());
+    }
+
+    #[test]
+    fn test_cache_reader_null_fields() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let json = r#"{"providers": null, "total_monthly_usd": 0}"#;
+        std::fs::write(tmp.path().join("billing.json"), json).unwrap();
+        let reader = CacheReader::new(tmp.path().to_path_buf());
+        let report = reader.read_billing().unwrap();
+        assert!(report.providers.is_empty());
+    }
+}

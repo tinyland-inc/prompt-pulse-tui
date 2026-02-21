@@ -138,3 +138,73 @@ impl Default for TuiConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_config() {
+        let cfg = TuiConfig::default();
+        assert!(cfg.general.cache_dir.is_empty());
+        assert!(!cfg.image.waifu_enabled);
+        assert!(cfg.collectors.waifu.endpoint.is_empty());
+    }
+
+    #[test]
+    fn test_waifu_endpoint_empty_returns_none() {
+        let cfg = TuiConfig::default();
+        assert!(cfg.waifu_endpoint().is_none());
+    }
+
+    #[test]
+    fn test_waifu_endpoint_set() {
+        let mut cfg = TuiConfig::default();
+        cfg.collectors.waifu.endpoint = "https://waifu.example.com".into();
+        assert_eq!(cfg.waifu_endpoint(), Some("https://waifu.example.com"));
+    }
+
+    #[test]
+    fn test_waifu_category_default_fallback() {
+        let cfg = TuiConfig::default();
+        assert_eq!(cfg.waifu_category(), "sfw");
+    }
+
+    #[test]
+    fn test_waifu_category_collector_priority() {
+        let mut cfg = TuiConfig::default();
+        cfg.collectors.waifu.category = "nsfw".into();
+        cfg.image.waifu_category = "sfw".into();
+        assert_eq!(cfg.waifu_category(), "nsfw");
+    }
+
+    #[test]
+    fn test_waifu_category_image_fallback() {
+        let mut cfg = TuiConfig::default();
+        cfg.image.waifu_category = "waifu".into();
+        assert_eq!(cfg.waifu_category(), "waifu");
+    }
+
+    #[test]
+    fn test_toml_parse_minimal() {
+        let cfg: TuiConfig = toml::from_str("").unwrap();
+        assert!(cfg.waifu_endpoint().is_none());
+    }
+
+    #[test]
+    fn test_toml_parse_full() {
+        let toml_str = r#"
+[general]
+cache_dir = "/tmp/test"
+[collectors.waifu]
+endpoint = "https://waifu.example.com"
+category = "sfw"
+[image]
+waifu_enabled = true
+"#;
+        let cfg: TuiConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(cfg.cache_dir(), std::path::PathBuf::from("/tmp/test"));
+        assert_eq!(cfg.waifu_endpoint(), Some("https://waifu.example.com"));
+        assert!(cfg.image.waifu_enabled);
+    }
+}

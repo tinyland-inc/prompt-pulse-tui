@@ -334,3 +334,29 @@ fn format_rate(bytes_per_sec: u64) -> String {
         "idle".into()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pct_gradient_thresholds() {
+        // <40% should be Green
+        let low = pct_gradient(20);
+        assert_eq!(low, Color::Green);
+        // 90%+ should be Red
+        let high = pct_gradient(95);
+        assert_eq!(high, Color::Red);
+        // 65-79 should be Yellow
+        let mid = pct_gradient(70);
+        assert_eq!(mid, Color::Yellow);
+    }
+
+    #[test]
+    fn test_format_rate_units() {
+        assert!(format_rate(500).contains("B/s"));
+        assert!(format_rate(2048).contains("KB/s"));
+        assert!(format_rate(2 * 1024 * 1024).contains("MB/s"));
+        assert_eq!(format_rate(0), "idle");
+    }
+}

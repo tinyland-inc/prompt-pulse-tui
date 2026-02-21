@@ -903,3 +903,521 @@ impl App {
         self.active_tab = tabs[(idx + tabs.len() - 1) % tabs.len()];
     }
 }
+
+#[cfg(test)]
+impl App {
+    /// Create a test App that does NOT touch the OS, terminal, or filesystem.
+    /// All data fields are empty/default. Use builder-style methods to set state.
+    pub fn test_new(cfg: TuiConfig) -> Self {
+        let (waifu_fetch_tx, waifu_fetch_rx) = mpsc::channel(4);
+        Self {
+            cfg,
+            active_tab: Tab::Dashboard,
+            term_width: 160,
+            term_height: 50,
+            show_help: false,
+            help_tab: 0,
+            frozen: false,
+            process_filter: String::new(),
+            filter_mode: false,
+            refresh_ms: 1000,
+            show_cmd: false,
+            tree_mode: false,
+            sys: SysMetrics::empty(),
+            cpu_history: VecDeque::new(),
+            cpu_per_core_history: Vec::new(),
+            mem_history: VecDeque::new(),
+            swap_history: VecDeque::new(),
+            net_rx_history: VecDeque::new(),
+            net_tx_history: VecDeque::new(),
+            load_history: VecDeque::new(),
+            temp_history: VecDeque::new(),
+            pending_kill: None,
+            processes: Vec::new(),
+            process_sort: ProcessSort::Cpu,
+            sort_reverse: false,
+            process_scroll: 0,
+            total_process_count: 0,
+            tailscale: None,
+            claude: None,
+            billing: None,
+            k8s: None,
+            waifu_state: None,
+            waifu_images: Vec::new(),
+            waifu_index: -1,
+            waifu_show_info: false,
+            waifu_name: String::new(),
+            waifu_fetching: false,
+            claude_personal: None,
+            expanded: false,
+            picker: Picker::from_fontsize((8, 16)),
+            proc_sys: sysinfo::System::new(),
+            users: sysinfo::Users::new_with_refreshed_list(),
+            cache_reader: CacheReader::new(std::path::PathBuf::from("/nonexistent")),
+            last_cache_read: Instant::now(),
+            last_sys_refresh: Instant::now(),
+            component_versions: Default::default(),
+            waifu_fetch_rx,
+            waifu_fetch_tx,
+        }
+    }
+
+    /// Builder: set waifu image list for testing navigation.
+    pub fn with_waifu_images(mut self, images: Vec<PathBuf>) -> Self {
+        self.waifu_images = images;
+        if !self.waifu_images.is_empty() {
+            self.waifu_index = 0;
+        }
+        self
+    }
+
+    /// Builder: enable waifu in config.
+    pub fn with_waifu_enabled(mut self) -> Self {
+        self.cfg.image.waifu_enabled = true;
+        self
+    }
+
+    /// Builder: set processes for testing scroll/sort.
+    pub fn with_processes(mut self, procs: Vec<ProcessInfo>) -> Self {
+        self.total_process_count = procs.len();
+        self.processes = procs;
+        self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::TuiConfig;
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    fn key(code: KeyCode) -> KeyEvent {
+        KeyEvent::new(code, KeyModifiers::NONE)
+    }
+
+    fn char_key(c: char) -> KeyEvent {
+        key(KeyCode::Char(c))
+    }
+
+    fn make_procs(n: usize) -> Vec<ProcessInfo> {
+        (0..n)
+            .map(|i| ProcessInfo {
+                pid: i as u32,
+                ppid: 0,
+                name: format!("p{i}"),
+                cmd: String::new(),
+                user: String::new(),
+                cpu_usage: 0.0,
+                memory_bytes: 0,
+                state: ProcessState::Run,
+                run_time_secs: 0,
+                tree_depth: 0,
+            })
+            .collect()
+    }
+
+    // --- Tab Navigation ---
+
+    #[test]
+    fn test_tab_next_cycles() {
+        let mut app = App::test_new(TuiConfig::default());
+        assert_eq!(app.active_tab, Tab::Dashboard);
+        app.handle_key(key(KeyCode::Tab));
+        assert_eq!(app.active_tab, Tab::System);
+        app.handle_key(key(KeyCode::Tab));
+        assert_eq!(app.active_tab, Tab::Network);
+        app.handle_key(key(KeyCode::Tab));
+        assert_eq!(app.active_tab, Tab::Billing);
+        app.handle_key(key(KeyCode::Tab));
+        assert_eq!(app.active_tab, Tab::Build);
+        app.handle_key(key(KeyCode::Tab));
+        assert_eq!(app.active_tab, Tab::Dashboard);
+    }
+
+    #[test]
+    fn test_tab_number_keys() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.handle_key(char_key('3'));
+        assert_eq!(app.active_tab, Tab::Network);
+        app.handle_key(char_key('5'));
+        assert_eq!(app.active_tab, Tab::Build);
+        app.handle_key(char_key('1'));
+        assert_eq!(app.active_tab, Tab::Dashboard);
+    }
+
+    #[test]
+    fn test_tab_prev_wraps() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.handle_key(key(KeyCode::BackTab));
+        assert_eq!(app.active_tab, Tab::Build);
+    }
+
+    // --- Filter Mode ---
+
+    #[test]
+    fn test_filter_mode_captures_chars() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.handle_key(char_key('/'));
+        assert!(app.filter_mode);
+        app.handle_key(char_key('f'));
+        app.handle_key(char_key('o'));
+        app.handle_key(char_key('o'));
+        assert_eq!(app.process_filter, "foo");
+        // Tab should NOT switch tabs in filter mode.
+        app.handle_key(key(KeyCode::Tab));
+        assert!(app.filter_mode);
+        assert_eq!(app.active_tab, Tab::Dashboard);
+    }
+
+    #[test]
+    fn test_filter_mode_esc_clears() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.handle_key(char_key('/'));
+        app.handle_key(char_key('x'));
+        app.handle_key(key(KeyCode::Esc));
+        assert!(!app.filter_mode);
+        assert!(app.process_filter.is_empty());
+    }
+
+    #[test]
+    fn test_filter_mode_enter_keeps() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.handle_key(char_key('/'));
+        app.handle_key(char_key('x'));
+        app.handle_key(key(KeyCode::Enter));
+        assert!(!app.filter_mode);
+        assert_eq!(app.process_filter, "x");
+    }
+
+    #[test]
+    fn test_filter_mode_backspace() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.handle_key(char_key('/'));
+        app.handle_key(char_key('a'));
+        app.handle_key(char_key('b'));
+        app.handle_key(key(KeyCode::Backspace));
+        assert_eq!(app.process_filter, "a");
+    }
+
+    // --- Help Overlay ---
+
+    #[test]
+    fn test_help_toggle() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.handle_key(char_key('?'));
+        assert!(app.show_help);
+        assert_eq!(app.help_tab, 0);
+        app.handle_key(char_key('?'));
+        assert!(!app.show_help);
+    }
+
+    #[test]
+    fn test_help_tab_navigation() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.handle_key(char_key('?'));
+        assert!(app.show_help);
+        app.handle_key(key(KeyCode::Tab));
+        assert_eq!(app.help_tab, 1);
+        app.handle_key(key(KeyCode::Right));
+        assert_eq!(app.help_tab, 2);
+        app.handle_key(char_key('4'));
+        assert_eq!(app.help_tab, 3);
+        app.handle_key(key(KeyCode::Tab));
+        assert_eq!(app.help_tab, 0); // wraps
+    }
+
+    #[test]
+    fn test_help_dismiss_on_random_key() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.handle_key(char_key('?'));
+        assert!(app.show_help);
+        app.handle_key(char_key('x'));
+        assert!(!app.show_help);
+    }
+
+    // --- Expanded Mode ---
+
+    #[test]
+    fn test_expanded_mode_esc_exits() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.expanded = true;
+        app.handle_key(key(KeyCode::Esc));
+        assert!(!app.expanded);
+    }
+
+    #[test]
+    fn test_expanded_mode_ignores_tab() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.expanded = true;
+        app.handle_key(key(KeyCode::Tab));
+        assert!(app.expanded);
+        assert_eq!(app.active_tab, Tab::Dashboard);
+    }
+
+    #[test]
+    fn test_expanded_mode_waifu_keys() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.expanded = true;
+        app.handle_key(char_key('i'));
+        assert!(app.waifu_show_info);
+        app.handle_key(char_key('i'));
+        assert!(!app.waifu_show_info);
+    }
+
+    // --- wants_waifu / has_waifu ---
+
+    #[test]
+    fn test_wants_waifu_disabled() {
+        let app = App::test_new(TuiConfig::default());
+        assert!(!app.wants_waifu());
+        assert!(!app.has_waifu());
+    }
+
+    #[test]
+    fn test_wants_waifu_enabled_with_endpoint() {
+        let mut cfg = TuiConfig::default();
+        cfg.image.waifu_enabled = true;
+        cfg.collectors.waifu.endpoint = "https://waifu.example.com".into();
+        let app = App::test_new(cfg);
+        assert!(app.wants_waifu());
+        assert!(!app.has_waifu());
+    }
+
+    #[test]
+    fn test_wants_waifu_enabled_with_images() {
+        let mut cfg = TuiConfig::default();
+        cfg.image.waifu_enabled = true;
+        let app = App::test_new(cfg).with_waifu_images(vec![PathBuf::from("/fake/image.png")]);
+        assert!(app.wants_waifu());
+    }
+
+    #[test]
+    fn test_has_waifu_requires_loaded_state() {
+        let mut cfg = TuiConfig::default();
+        cfg.image.waifu_enabled = true;
+        cfg.collectors.waifu.endpoint = "https://example.com".into();
+        let app = App::test_new(cfg);
+        assert!(app.wants_waifu());
+        assert!(!app.has_waifu()); // no image loaded yet
+    }
+
+    // --- Waifu Key Routing ---
+
+    #[tokio::test]
+    async fn test_dashboard_waifu_fetch_key() {
+        let mut cfg = TuiConfig::default();
+        cfg.image.waifu_enabled = true;
+        cfg.collectors.waifu.endpoint = "https://example.com".into();
+        let mut app = App::test_new(cfg);
+        app.active_tab = Tab::Dashboard;
+        app.handle_key(char_key('f'));
+        assert!(app.waifu_fetching);
+    }
+
+    #[test]
+    fn test_system_tab_n_is_sort() {
+        let mut cfg = TuiConfig::default();
+        cfg.image.waifu_enabled = true;
+        cfg.collectors.waifu.endpoint = "https://example.com".into();
+        let mut app = App::test_new(cfg);
+        app.active_tab = Tab::System;
+        app.handle_key(char_key('n'));
+        assert_eq!(app.process_sort, ProcessSort::Name);
+    }
+
+    #[test]
+    fn test_waifu_keys_require_wants_waifu() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.active_tab = Tab::Dashboard;
+        // Without waifu enabled, 'n' should be sort key
+        app.handle_key(char_key('n'));
+        assert_eq!(app.process_sort, ProcessSort::Name);
+    }
+
+    // --- Process Scroll & Sort ---
+
+    #[test]
+    fn test_process_scroll_bounded() {
+        let mut app = App::test_new(TuiConfig::default()).with_processes(make_procs(5));
+        for _ in 0..20 {
+            app.handle_key(char_key('j'));
+        }
+        assert_eq!(app.process_scroll, 4);
+    }
+
+    #[test]
+    fn test_refresh_rate_bounds() {
+        let mut app = App::test_new(TuiConfig::default());
+        assert_eq!(app.refresh_ms, 1000);
+        for _ in 0..20 {
+            app.handle_key(char_key('+'));
+        }
+        assert_eq!(app.refresh_ms, 250);
+        for _ in 0..40 {
+            app.handle_key(char_key('-'));
+        }
+        assert_eq!(app.refresh_ms, 5000);
+    }
+
+    #[test]
+    fn test_build_tree_parent_child() {
+        let procs = vec![
+            ProcessInfo {
+                pid: 1,
+                ppid: 0,
+                name: "init".into(),
+                cmd: String::new(),
+                user: String::new(),
+                cpu_usage: 0.0,
+                memory_bytes: 0,
+                state: ProcessState::Run,
+                run_time_secs: 0,
+                tree_depth: 0,
+            },
+            ProcessInfo {
+                pid: 2,
+                ppid: 1,
+                name: "child".into(),
+                cmd: String::new(),
+                user: String::new(),
+                cpu_usage: 0.0,
+                memory_bytes: 0,
+                state: ProcessState::Run,
+                run_time_secs: 0,
+                tree_depth: 0,
+            },
+        ];
+        let tree = App::build_tree(procs);
+        assert_eq!(tree[0].pid, 1);
+        assert_eq!(tree[0].tree_depth, 0);
+        assert_eq!(tree[1].pid, 2);
+        assert_eq!(tree[1].tree_depth, 1);
+    }
+
+    // --- Waifu Navigation Arithmetic ---
+
+    #[test]
+    fn test_navigate_empty_noop() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.waifu_navigate(1);
+        assert_eq!(app.waifu_index, -1);
+    }
+
+    #[test]
+    fn test_navigate_wraps_forward() {
+        // Test the wrap-around arithmetic directly
+        let n: i32 = 3;
+        let idx = 2;
+        let new = ((idx + 1) % n + n) % n;
+        assert_eq!(new, 0);
+    }
+
+    #[test]
+    fn test_navigate_wraps_backward() {
+        let n: i32 = 3;
+        let idx = 0;
+        let new = ((idx + (-1)) % n + n) % n;
+        assert_eq!(new, 2);
+    }
+
+    // --- Freeze Toggle ---
+
+    #[test]
+    fn test_freeze_toggle() {
+        let mut app = App::test_new(TuiConfig::default());
+        assert!(!app.frozen);
+        app.handle_key(char_key(' '));
+        assert!(app.frozen);
+        app.handle_key(char_key(' '));
+        assert!(!app.frozen);
+    }
+
+    // --- Mouse Handling ---
+
+    #[test]
+    fn test_mouse_scroll() {
+        use crossterm::event::{MouseEvent, MouseEventKind};
+        let mut app = App::test_new(TuiConfig::default()).with_processes(make_procs(20));
+        app.active_tab = Tab::System;
+        app.handle_mouse(MouseEvent {
+            kind: MouseEventKind::ScrollDown,
+            column: 50,
+            row: 20,
+            modifiers: KeyModifiers::NONE,
+        });
+        assert_eq!(app.process_scroll, 3);
+    }
+
+    // --- Property-Based Tests ---
+
+    use proptest::prelude::*;
+
+    fn arb_key_code() -> impl Strategy<Value = KeyCode> {
+        prop_oneof![
+            Just(KeyCode::Tab),
+            Just(KeyCode::BackTab),
+            Just(KeyCode::Esc),
+            Just(KeyCode::Enter),
+            Just(KeyCode::Up),
+            Just(KeyCode::Down),
+            Just(KeyCode::Left),
+            Just(KeyCode::Right),
+            Just(KeyCode::Home),
+            Just(KeyCode::End),
+            Just(KeyCode::PageUp),
+            Just(KeyCode::PageDown),
+            prop::char::range('a', 'z').prop_map(KeyCode::Char),
+            prop::char::range('0', '9').prop_map(KeyCode::Char),
+            Just(KeyCode::Char(' ')),
+            Just(KeyCode::Char('+')),
+            Just(KeyCode::Char('-')),
+            Just(KeyCode::Char('/')),
+            Just(KeyCode::Char('?')),
+        ]
+    }
+
+    proptest! {
+        #[test]
+        fn key_handling_never_panics(actions in proptest::collection::vec(arb_key_code(), 0..50)) {
+            let mut app = App::test_new(TuiConfig::default()).with_processes(make_procs(10));
+            for code in &actions {
+                let event = KeyEvent::new(*code, KeyModifiers::NONE);
+                app.handle_key(event);
+            }
+            // Invariants after any key sequence:
+            prop_assert!(Tab::ALL.contains(&app.active_tab));
+            prop_assert!(app.help_tab <= 3);
+            prop_assert!(app.refresh_ms >= 250 && app.refresh_ms <= 5000);
+            prop_assert!(app.process_scroll <= 9); // 10 procs, max scroll = 9
+        }
+
+        #[test]
+        fn resize_stores_dimensions(w in 40u16..=300u16, h in 10u16..=100u16) {
+            let mut app = App::test_new(TuiConfig::default());
+            app.on_resize(w, h);
+            prop_assert_eq!(app.term_width, w);
+            prop_assert_eq!(app.term_height, h);
+        }
+
+        #[test]
+        fn wants_waifu_logic(
+            enabled in proptest::bool::ANY,
+            has_endpoint in proptest::bool::ANY,
+            has_images in proptest::bool::ANY,
+        ) {
+            let mut cfg = TuiConfig::default();
+            cfg.image.waifu_enabled = enabled;
+            if has_endpoint {
+                cfg.collectors.waifu.endpoint = "https://waifu.example.com".into();
+            }
+            let mut app = App::test_new(cfg);
+            if has_images {
+                app = app.with_waifu_images(vec![std::path::PathBuf::from("/fake/a.png")]);
+            }
+            let wants = app.wants_waifu();
+            // Must be enabled AND (have endpoint OR have images)
+            let expected = enabled && (has_endpoint || has_images);
+            prop_assert_eq!(wants, expected);
+        }
+    }
+}

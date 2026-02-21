@@ -158,3 +158,39 @@ pub fn collect_versions(cfg: &TuiConfig) -> ComponentVersions {
         flake_inputs: read_flake_inputs(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_flake_lock_extracts_interesting() {
+        let lock_json = r#"{
+            "nodes": {
+                "nixpkgs": { "locked": { "rev": "abcdef1234567890abcdef1234567890" } },
+                "home-manager": { "locked": { "rev": "fedcba0987654321fedcba0987654321" } },
+                "unrelated": { "locked": { "rev": "111111111111111111111111" } }
+            }
+        }"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), lock_json).unwrap();
+        let inputs = parse_flake_lock(&tmp.path().to_path_buf()).unwrap();
+        let names: Vec<&str> = inputs.iter().map(|i| i.name.as_str()).collect();
+        assert!(names.contains(&"nixpkgs"));
+        assert!(names.contains(&"home-manager"));
+        assert!(!names.contains(&"unrelated"));
+    }
+
+    #[test]
+    fn test_parse_flake_lock_truncates_rev() {
+        let lock_json = r#"{
+            "nodes": {
+                "nixpkgs": { "locked": { "rev": "abcdef1234567890" } }
+            }
+        }"#;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), lock_json).unwrap();
+        let inputs = parse_flake_lock(&tmp.path().to_path_buf()).unwrap();
+        assert_eq!(inputs[0].rev, "abcdef12");
+    }
+}

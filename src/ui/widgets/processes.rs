@@ -305,3 +305,28 @@ fn format_bytes(bytes: u64) -> String {
         format!("{:.0} KiB", bytes as f64 / KIB as f64)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_duration() {
+        // Under 1 hour: "m:ss" format
+        let result = format_duration(30);
+        assert!(result.contains("30"), "got: {result}");
+        // 1 hour: "h:mm:ss" format
+        let result = format_duration(3600);
+        assert!(result.contains("1:"), "got: {result}");
+        // Days
+        let result = format_duration(90000);
+        assert!(result.contains("1d"), "got: {result}");
+    }
+
+    #[test]
+    fn test_format_bytes() {
+        assert!(format_bytes(500).contains("KiB"));
+        assert!(format_bytes(2 * 1024 * 1024).contains("MiB"));
+        assert!(format_bytes(2 * 1024 * 1024 * 1024).contains("GiB"));
+    }
+}

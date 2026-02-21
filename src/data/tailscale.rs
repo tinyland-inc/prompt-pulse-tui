@@ -55,3 +55,47 @@ impl TailscaleStatus {
         peers
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tailscale_null_peers() {
+        let json = r#"{"peers": null, "tailnet_name": "test"}"#;
+        let status: TailscaleStatus = serde_json::from_str(json).unwrap();
+        assert!(status.peers.is_empty());
+        assert_eq!(status.tailnet_name, "test");
+    }
+
+    #[test]
+    fn test_tailscale_null_tags() {
+        let json =
+            r#"{"peers": [{"hostname": "test", "tags": null, "tailscale_ips": ["100.1.2.3"]}]}"#;
+        let status: TailscaleStatus = serde_json::from_str(json).unwrap();
+        assert!(status.peers[0].tags.is_empty());
+    }
+
+    #[test]
+    fn test_tailscale_null_ips() {
+        let json = r#"{"peers": [{"hostname": "test", "tailscale_ips": null}]}"#;
+        let status: TailscaleStatus = serde_json::from_str(json).unwrap();
+        assert!(status.peers[0].tailscale_ips.is_empty());
+    }
+
+    #[test]
+    fn test_online_peers_sorted() {
+        let json = r#"{
+            "peers": [
+                {"hostname": "zebra", "online": true},
+                {"hostname": "apple", "online": false},
+                {"hostname": "banana", "online": true}
+            ]
+        }"#;
+        let status: TailscaleStatus = serde_json::from_str(json).unwrap();
+        let online = status.online_peers_sorted();
+        assert_eq!(online.len(), 2);
+        assert_eq!(online[0].hostname, "banana");
+        assert_eq!(online[1].hostname, "zebra");
+    }
+}

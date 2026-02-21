@@ -75,3 +75,72 @@ pub fn compute_report(state: &ClaudePersonalState) -> ClaudePersonalReport {
         next_slot_secs,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_state(timestamps: Vec<String>, window_hours: i32, limit: i32) -> ClaudePersonalState {
+        ClaudePersonalState {
+            messages: timestamps
+                .into_iter()
+                .map(|ts| PersonalMessage {
+                    ts,
+                    model: None,
+                    source: "test".into(),
+                })
+                .collect(),
+            window_hours,
+            message_limit: limit,
+            last_scan: String::new(),
+        }
+    }
+
+    #[test]
+    fn test_compute_report_under_limit() {
+        let now = chrono::Utc::now();
+        let ts = (now - chrono::Duration::minutes(30)).to_rfc3339();
+        let state = make_state(vec![ts], 5, 45);
+        let report = compute_report(&state);
+        assert_eq!(report.messages_in_window, 1);
+        assert_eq!(report.next_slot_secs, 0);
+    }
+
+    #[test]
+    fn test_compute_report_at_limit() {
+        let now = chrono::Utc::now();
+        let timestamps: Vec<String> = (0..45)
+            .map(|i| (now - chrono::Duration::minutes(i * 5)).to_rfc3339())
+            .collect();
+        let state = make_state(timestamps, 5, 45);
+        let report = compute_report(&state);
+        assert_eq!(report.messages_in_window, 45);
+        assert!(report.next_slot_secs > 0);
+    }
+
+    #[test]
+    fn test_compute_report_empty() {
+        let state = make_state(vec![], 5, 45);
+        let report = compute_report(&state);
+        assert_eq!(report.messages_in_window, 0);
+        assert_eq!(report.next_slot_secs, 0);
+    }
+
+    #[test]
+    fn test_compute_report_all_expired() {
+        let old = (chrono::Utc::now() - chrono::Duration::hours(10)).to_rfc3339();
+        let state = make_state(vec![old], 5, 45);
+        let report = compute_report(&state);
+        assert_eq!(report.messages_in_window, 0);
+    }
+
+    #[test]
+    fn test_compute_report_mixed() {
+        let now = chrono::Utc::now();
+        let recent = (now - chrono::Duration::minutes(30)).to_rfc3339();
+        let old = (now - chrono::Duration::hours(10)).to_rfc3339();
+        let state = make_state(vec![recent, old], 5, 45);
+        let report = compute_report(&state);
+        assert_eq!(report.messages_in_window, 1);
+    }
+}

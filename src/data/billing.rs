@@ -42,3 +42,22 @@ pub struct ResourceCost {
     #[serde(default)]
     pub hourly_cost: f64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_billing_null_providers() {
+        let json = r#"{"providers": null, "total_monthly_usd": 0}"#;
+        let report: BillingReport = serde_json::from_str(json).unwrap();
+        assert!(report.providers.is_empty());
+    }
+
+    #[test]
+    fn test_billing_null_resources() {
+        let json = r#"{"providers": [{"name": "test", "resources": null}]}"#;
+        let report: BillingReport = serde_json::from_str(json).unwrap();
+        assert!(report.providers[0].resources.is_empty());
+    }
+}

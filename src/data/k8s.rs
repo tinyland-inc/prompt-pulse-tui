@@ -66,3 +66,29 @@ pub struct PodCounts {
     #[serde(default)]
     pub failed: i32,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_k8s_null_clusters() {
+        let json = r#"{"clusters": null}"#;
+        let status: K8sStatus = serde_json::from_str(json).unwrap();
+        assert!(status.clusters.is_empty());
+    }
+
+    #[test]
+    fn test_k8s_null_nodes() {
+        let json = r#"{"clusters": [{"context": "test", "nodes": null, "namespaces": []}]}"#;
+        let status: K8sStatus = serde_json::from_str(json).unwrap();
+        assert!(status.clusters[0].nodes.is_empty());
+    }
+
+    #[test]
+    fn test_k8s_null_roles() {
+        let json = r#"{"clusters": [{"context": "test", "nodes": [{"name": "n1", "roles": null}], "namespaces": []}]}"#;
+        let status: K8sStatus = serde_json::from_str(json).unwrap();
+        assert!(status.clusters[0].nodes[0].roles.is_empty());
+    }
+}

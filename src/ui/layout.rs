@@ -294,3 +294,158 @@ pub fn billing(frame: &mut Frame, area: Rect, app: &mut App) {
     widgets::claude::draw_claude(frame, chunks[1], app);
     widgets::billing_widget::draw_billing(frame, chunks[2], app);
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::app::{App, Tab};
+    use crate::config::TuiConfig;
+    use ratatui::{backend::TestBackend, buffer::Buffer, Terminal};
+    use std::path::PathBuf;
+
+    /// Check if a rendered Buffer contains a substring.
+    fn buffer_contains(buf: &Buffer, needle: &str) -> bool {
+        let content: String = buf.content().iter().map(|c| c.symbol()).collect();
+        content.contains(needle)
+    }
+
+    fn render_app(width: u16, height: u16, app: &mut App) -> Buffer {
+        app.on_resize(width, height);
+        let backend = TestBackend::new(width, height);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal.draw(|frame| crate::ui::draw(frame, app)).unwrap();
+        terminal.backend().buffer().clone()
+    }
+
+    // --- Dashboard tab: wide layout ---
+
+    #[test]
+    fn wide_no_waifu_shows_kubernetes() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.active_tab = Tab::Dashboard;
+        let buf = render_app(160, 50, &mut app);
+        assert!(
+            buffer_contains(&buf, "Kubernetes"),
+            "Kubernetes widget should appear when waifu is off"
+        );
+        assert!(
+            !buffer_contains(&buf, "Waifu"),
+            "Waifu should not appear when disabled"
+        );
+    }
+
+    #[test]
+    fn wide_with_waifu_shows_waifu() {
+        let mut app = App::test_new(TuiConfig::default())
+            .with_waifu_enabled()
+            .with_waifu_images(vec![PathBuf::from("/fake/a.png")]);
+        app.active_tab = Tab::Dashboard;
+        let buf = render_app(160, 50, &mut app);
+        assert!(
+            buffer_contains(&buf, "Waifu"),
+            "Waifu widget should appear when enabled with images"
+        );
+    }
+
+    #[test]
+    fn wide_with_waifu_hides_kubernetes() {
+        let mut app = App::test_new(TuiConfig::default())
+            .with_waifu_enabled()
+            .with_waifu_images(vec![PathBuf::from("/fake/a.png")]);
+        app.active_tab = Tab::Dashboard;
+        let buf = render_app(160, 50, &mut app);
+        assert!(
+            !buffer_contains(&buf, "Kubernetes"),
+            "Kubernetes should be hidden when waifu is shown"
+        );
+    }
+
+    // --- Dashboard tab: narrow layout ---
+
+    #[test]
+    fn narrow_shows_host() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.active_tab = Tab::Dashboard;
+        let buf = render_app(80, 40, &mut app);
+        assert!(
+            buffer_contains(&buf, "Host"),
+            "Host widget should appear in narrow layout"
+        );
+    }
+
+    // --- System tab ---
+
+    #[test]
+    fn system_tab_shows_memory() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.active_tab = Tab::System;
+        let buf = render_app(160, 50, &mut app);
+        assert!(
+            buffer_contains(&buf, "Memory"),
+            "System tab should show Memory widget"
+        );
+    }
+
+    // --- Network tab ---
+
+    #[test]
+    fn network_tab_shows_tailscale() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.active_tab = Tab::Network;
+        let buf = render_app(160, 50, &mut app);
+        assert!(
+            buffer_contains(&buf, "Tailscale"),
+            "Network tab should show Tailscale widget"
+        );
+    }
+
+    #[test]
+    fn network_tab_shows_kubernetes() {
+        let mut app = App::test_new(TuiConfig::default());
+        app.active_tab = Tab::Network;
+        let buf = render_app(160, 50, &mut app);
+        assert!(
+            buffer_contains(&buf, "Kubernetes"),
+            "Network tab should show Kubernetes widget"
+        );
+    }
+
+    // --- Expanded mode ---
+
+    #[test]
+    fn expanded_mode_no_tab_bar() {
+        let mut app = App::test_new(TuiConfig::default())
+            .with_waifu_enabled()
+            .with_waifu_images(vec![PathBuf::from("/fake/a.png")]);
+        app.expanded = true;
+        let buf = render_app(160, 50, &mut app);
+        // In expanded mode, only waifu renders -- no tab bar with Dashboard/System/etc.
+        assert!(
+            !buffer_contains(&buf, "Dashboard"),
+            "Tab bar should not appear in expanded mode"
+        );
+        assert!(
+            buffer_contains(&buf, "Waifu"),
+            "Waifu should render fullscreen in expanded mode"
+        );
+    }
+
+    // --- All tabs render without panic ---
+
+    #[test]
+    fn all_tabs_render_wide() {
+        for tab in Tab::ALL {
+            let mut app = App::test_new(TuiConfig::default());
+            app.active_tab = *tab;
+            let _buf = render_app(160, 50, &mut app);
+        }
+    }
+
+    #[test]
+    fn all_tabs_render_narrow() {
+        for tab in Tab::ALL {
+            let mut app = App::test_new(TuiConfig::default());
+            app.active_tab = *tab;
+            let _buf = render_app(80, 30, &mut app);
+        }
+    }
+}

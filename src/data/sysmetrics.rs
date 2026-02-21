@@ -112,6 +112,19 @@ fn classify_interface(name: &str) -> NetKind {
 }
 
 impl SysMetrics {
+    /// Create a SysMetrics with minimal system data for headless testing.
+    /// Does NOT perform expensive CPU refresh or full system enumeration.
+    #[cfg(test)]
+    pub fn empty() -> Self {
+        Self {
+            sys: System::new(),
+            disks: Disks::new_with_refreshed_list(),
+            networks: Networks::new_with_refreshed_list(),
+            components: Components::new_with_refreshed_list(),
+            prev_net: HashMap::new(),
+        }
+    }
+
     pub fn collect() -> Self {
         let mut sys = System::new_with_specifics(
             RefreshKind::new()
@@ -391,4 +404,37 @@ fn get_local_ip() -> String {
             .unwrap_or_else(|_| "unknown".into())
     })
     .clone()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify_wifi() {
+        assert!(matches!(classify_interface("wlan0"), NetKind::Wifi));
+        assert!(matches!(classify_interface("wlp2s0"), NetKind::Wifi));
+        assert!(matches!(classify_interface("en0"), NetKind::Wifi));
+    }
+
+    #[test]
+    fn test_classify_ethernet() {
+        assert!(matches!(classify_interface("eth0"), NetKind::Ethernet));
+        assert!(matches!(classify_interface("enp3s0"), NetKind::Ethernet));
+        assert!(matches!(classify_interface("en1"), NetKind::Ethernet));
+    }
+
+    #[test]
+    fn test_classify_virtual() {
+        assert!(matches!(classify_interface("veth12345"), NetKind::Virtual));
+        assert!(matches!(classify_interface("docker0"), NetKind::Virtual));
+        assert!(matches!(classify_interface("br-abc123"), NetKind::Virtual));
+        assert!(matches!(classify_interface("cali987"), NetKind::Virtual));
+    }
+
+    #[test]
+    fn test_classify_unknown() {
+        assert!(matches!(classify_interface("lo"), NetKind::Unknown));
+        assert!(matches!(classify_interface("tun0"), NetKind::Unknown));
+    }
 }

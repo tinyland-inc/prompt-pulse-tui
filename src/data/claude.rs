@@ -76,3 +76,29 @@ pub struct WorkspaceUsage {
     #[serde(default)]
     pub cost_usd: f64,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_claude_null_accounts() {
+        let json = r#"{"accounts": null, "total_cost_usd": 0}"#;
+        let usage: ClaudeUsage = serde_json::from_str(json).unwrap();
+        assert!(usage.accounts.is_empty());
+    }
+
+    #[test]
+    fn test_claude_null_models() {
+        let json = r#"{"accounts": [{"name": "test", "models": null, "workspaces": []}]}"#;
+        let usage: ClaudeUsage = serde_json::from_str(json).unwrap();
+        assert!(usage.accounts[0].models.is_empty());
+    }
+
+    #[test]
+    fn test_claude_null_workspaces() {
+        let json = r#"{"accounts": [{"name": "test", "models": [], "workspaces": null}]}"#;
+        let usage: ClaudeUsage = serde_json::from_str(json).unwrap();
+        assert!(usage.accounts[0].workspaces.is_empty());
+    }
+}
